@@ -33,7 +33,7 @@
         <div class="space-y-3 text-xs">
           <div>
             <label class="block text-slate-400 font-bold mb-1">LS증권 APP KEY (LS_APP_KEY):</label>
-            <input v-model="lsAppKey" type="text" placeholder="PSxqiyZfJsMtqWtGp4EiVY5xqsCJANkJb8y7" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-indigo-500 font-mono">
+            <input v-model="lsAppKey" type="text" placeholder="환경변수(.env)에 설정됨 (예: PSx...)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-indigo-500 font-mono">
           </div>
 
           <div>
@@ -43,7 +43,7 @@
 
           <div>
             <label class="block text-slate-400 font-bold mb-1">Anthropic / OneProvider AI API Key:</label>
-            <input v-model="aiApiKey" type="password" placeholder="sk-2a4cdf13ca5e05a9b347ae1c3cc78e03d3fbeafda57af2053054ca5b8024ae58" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-indigo-500 font-mono">
+            <input v-model="aiApiKey" type="password" placeholder="환경변수(.env)에 설정됨 (예: sk-...)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-indigo-500 font-mono">
           </div>
 
           <div>
@@ -104,9 +104,9 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 
-const lsAppKey = ref('PSxqiyZfJsMtqWtGp4EiVY5xqsCJANkJb8y7');
-const lsSecret = ref('0NBTDo5J2k7HvS4HYttPoBtcVJIvI6BQ');
-const aiApiKey = ref('sk-2a4cdf13ca5e05a9b347ae1c3cc78e03d3fbeafda57af2053054ca5b8024ae58');
+const lsAppKey = ref('');
+const lsSecret = ref('');
+const aiApiKey = ref('');
 const aiModel = ref('claude-sonnet-4-6');
 
 const targetQuantScore = ref(85);
