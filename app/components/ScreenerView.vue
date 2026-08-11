@@ -199,9 +199,11 @@
                 <!-- Price Display with Delta -->
                 <td class="px-3 py-3 font-extrabold text-slate-100">
                   <div>{{ Number(item.closePrice).toLocaleString() }}원</div>
-                  <div v-if="getPriceDelta(item)" class="text-[10px] font-bold" :class="getPriceDelta(item).class">
-                    {{ getPriceDelta(item).text }}
-                  </div>
+                  <template v-if="getPriceDelta(item)">
+                    <div class="text-[10px] font-bold" :class="getPriceDelta(item)?.class">
+                      {{ getPriceDelta(item)?.text }}
+                    </div>
+                  </template>
                 </td>
 
                 <td class="px-3 py-3" :class="item.psy <= 25 ? 'text-emerald-400 font-extrabold' : 'text-slate-300'">
