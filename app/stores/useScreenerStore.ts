@@ -43,6 +43,7 @@ export const useScreenerStore = defineStore('screener', {
 
   actions: {
     async refreshScreener() {
+      if (this.isRefreshing) return;
       this.isRefreshing = true;
       try {
         const response = await $fetch<{
@@ -54,13 +55,17 @@ export const useScreenerStore = defineStore('screener', {
         }>('/api/screener', { method: 'POST' });
 
         if (response && response.success) {
-          this.oldData = response.oldData || [];
-          this.newData = response.newData || [];
+          if (response.newData && response.newData.length > 0) {
+            this.newData = response.newData;
+          }
+          if (response.oldData && response.oldData.length > 0) {
+            this.oldData = response.oldData;
+          }
           this.lastUpdated = response.timestamp || new Date().toLocaleString('ko-KR');
           this.sourceProvider = response.source || this.sourceProvider;
         }
       } catch (err) {
-        console.error('Screener refresh error:', err);
+        console.error('Screener refresh warning:', err);
       } finally {
         this.isRefreshing = false;
       }

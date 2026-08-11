@@ -19,6 +19,9 @@
           </p>
         </div>
         <div class="flex items-center gap-3">
+          <NuxtLink to="/portfolio" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-500/20 flex items-center gap-2 transition-all active:scale-95">
+            <i class="fas fa-wallet"></i> 보유종목 상세관리
+          </NuxtLink>
           <NuxtLink to="/screener" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 flex items-center gap-2 transition-all active:scale-95">
             <i class="fas fa-search-dollar"></i> 관심종목 스크리너 이동
           </NuxtLink>
@@ -29,32 +32,38 @@
     <!-- Key Metrics Cards Grid -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <!-- Total Investment Amount -->
-      <div class="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl space-y-2 shadow-lg">
-        <div class="flex items-center justify-between text-xs text-slate-400">
+      <NuxtLink to="/portfolio" class="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl space-y-2 shadow-lg hover:border-purple-500/50 hover:bg-slate-900 transition-all cursor-pointer block group">
+        <div class="flex items-center justify-between text-xs text-slate-400 group-hover:text-purple-300">
           <span>총 매수금액</span>
           <i class="fas fa-coins text-amber-400"></i>
         </div>
         <div class="text-2xl font-extrabold text-white font-mono">
           {{ formatKrw(portfolioStore.totalPurchaseAmount) }}
         </div>
-        <p class="text-[11px] text-slate-400">보유 종목 평단가 × 수량 합계</p>
-      </div>
+        <p class="text-[11px] text-slate-400 flex items-center justify-between">
+          <span>보유 종목 평단가 × 수량 합계</span>
+          <span class="text-purple-400 font-bold group-hover:underline">상세보기 &rarr;</span>
+        </p>
+      </NuxtLink>
 
       <!-- Total Valuation Amount -->
-      <div class="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl space-y-2 shadow-lg">
-        <div class="flex items-center justify-between text-xs text-slate-400">
+      <NuxtLink to="/portfolio" class="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl space-y-2 shadow-lg hover:border-cyan-500/50 hover:bg-slate-900 transition-all cursor-pointer block group">
+        <div class="flex items-center justify-between text-xs text-slate-400 group-hover:text-cyan-300">
           <span>총 평가금액</span>
           <i class="fas fa-chart-line text-cyan-400"></i>
         </div>
         <div class="text-2xl font-extrabold text-slate-100 font-mono">
           {{ formatKrw(portfolioStore.totalValuationAmount) }}
         </div>
-        <p class="text-[11px] text-slate-400">LS증권 연동 실시간 시세 반영</p>
-      </div>
+        <p class="text-[11px] text-slate-400 flex items-center justify-between">
+          <span>LS증권 연동 실시간 시세 반영</span>
+          <span class="text-cyan-400 font-bold group-hover:underline">상세보기 &rarr;</span>
+        </p>
+      </NuxtLink>
 
       <!-- Total PnL Amount & Rate -->
-      <div class="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl space-y-2 shadow-lg">
-        <div class="flex items-center justify-between text-xs text-slate-400">
+      <NuxtLink to="/portfolio" class="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl space-y-2 shadow-lg hover:border-indigo-500/50 hover:bg-slate-900 transition-all cursor-pointer block group">
+        <div class="flex items-center justify-between text-xs text-slate-400 group-hover:text-indigo-300">
           <span>평가 손익 (수익률)</span>
           <i class="fas fa-percentage" :class="portfolioStore.totalPnlAmount >= 0 ? 'text-rose-400' : 'text-emerald-400'"></i>
         </div>
@@ -62,8 +71,11 @@
           <span>{{ portfolioStore.totalPnlAmount >= 0 ? '+' : '' }}{{ formatKrw(portfolioStore.totalPnlAmount) }}</span>
           <span class="text-sm">({{ portfolioStore.totalPnlRate >= 0 ? '+' : '' }}{{ portfolioStore.totalPnlRate }}%)</span>
         </div>
-        <p class="text-[11px] text-slate-400">실시간 누적 손익 상태</p>
-      </div>
+        <p class="text-[11px] text-slate-400 flex items-center justify-between">
+          <span>실시간 누적 손익 상태</span>
+          <span class="text-indigo-400 font-bold group-hover:underline">상세보기 &rarr;</span>
+        </p>
+      </NuxtLink>
 
       <!-- Monitored Screener Matched Count -->
       <div class="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl space-y-2 shadow-lg">

@@ -42,7 +42,7 @@ async function getLSToken(appKey: string, appSecret: string): Promise<string | n
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: bodyParams.toString(),
-        signal: AbortSignal.timeout(3000)
+        signal: AbortSignal.timeout(1500)
       });
       if (response.ok) {
         const data = await response.json();
@@ -65,7 +65,7 @@ async function getLSPrice(token: string, shcode: string): Promise<number | null>
         'tr_cont': 'N'
       },
       body: JSON.stringify({ t1102InBlock: { shcode: rawCode } }),
-      signal: AbortSignal.timeout(3000)
+      signal: AbortSignal.timeout(1500)
     });
     if (res.ok) {
       const data = await res.json();
@@ -147,17 +147,20 @@ export default defineEventHandler(async () => {
   const localTime = `${year}-${month}-${day} ${hours}:${minutes}:${seconds} (LS증권 API)`;
 
   if (token && items.length > 0) {
-    for (const item of items) {
-      const livePrice = await getLSPrice(token, item.shcode);
-      if (livePrice && livePrice > 0) {
-        item.currentPrice = livePrice;
-        item.updatedAt = localTime;
-        db.update(holdings)
-          .set({ currentPrice: livePrice, updatedAt: localTime })
-          .where(eq(holdings.shcode, item.shcode))
-          .run();
-      }
-    }
+    const updatePromises = items.map(async (item) => {
+      try {
+        const livePrice = await getLSPrice(token, item.shcode);
+        if (livePrice && livePrice > 0) {
+          item.currentPrice = livePrice;
+          item.updatedAt = localTime;
+          db.update(holdings)
+            .set({ currentPrice: livePrice, updatedAt: localTime })
+            .where(eq(holdings.shcode, item.shcode))
+            .run();
+        }
+      } catch (e) {}
+    });
+    await Promise.allSettled(updatePromises);
   }
 
   return items;
