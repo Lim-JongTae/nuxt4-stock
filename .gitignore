@@ -13,16 +13,41 @@ node_modules
 logs
 *.log
 
-# Misc
-.DS_Store
-.fleet
-.idea
-
 # Local env files
 .env
 .env.*
 !.env.example
 
-# Local SQLite DB
-data/*.db
-data/*.db-journal
+# Local SQLite DB & Data
+data/
+*.db
+*.db-journal
+*.sqlite
+
+# AI Generated Reports, Artifacts & Agent Data
+.agents/
+implementation_plan.md
+walkthrough.md
+NewsReport/
+report/*.json
+report/*.md
+report/images/
+scratch/
+
+# System & OS Files
+.DS_Store
+.fleet
+.idea
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
