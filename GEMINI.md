@@ -1,0 +1,25 @@
+- 종목.md 에는 보유종목과 관심종목이 있음
+- 보유종목은 보유수량 \* 평균단가 로 매수함
+- 보고서 생성 시 종목.md의 분류를 정확히 따를 것: 보유종목은 holdings, 관심종목은 watchlist로 분류
+- 주식 종목에 대한 정보를 분석하여 보고서를 생성할때는 skills\finace-helper을 사용
+- 이동편균선, 거래량, 상대강도지수, 볼린저 밴드, 변동성 지수등과 필요한 차트를 분석하여 종합적 판단을 해줘
+- LS 증권 사이트 자료를 이용하여 모든 분석활용 특히, 유망업종& 기술적지표 관심종목은 매수를 위한 것이므로 실수하지말고 정확하게 분석할것.
+- LS증권 API 가이드 URL: https://openapi.ls-sec.co.kr/apiservice?group_id=ffd2def7-a118-40f7-a0ab-cd4c6a538a90&api_id=33bd887a-6652-4209-88cd-5324bc7c5e36
+- LS 증권 API APP KEY, SECREAT KEY는 .env에 있음
+- LS 증권분석내용은 LS증권이라고 표시
+- LS 증권 API 가이드 학습후 내용을 report폴드에 LS증권API가이드.md로 저장, 자료가 있을 경우 학습하지 말것.
+
+### 사용가능한 스킬
+
+- report: 주식 정보를 분석하여 투자 조언을 포함한 자세한 보고서를 생성함
+- ls-capture: LS증권 화면/차트에서 종목을 검색하여 차트를 캡쳐함
+- sync-dahsboard: 생성된 json 리포트 테이터를 대시보드(`dash.js`)에 누적하여 동기화함
+- C:\AI\AG\skill\agentic-awesome-skills\skills, 이 폴드내 필요한 스킬찾아서 이 프로젝트의 skills폴드로 복사할것
+
+### 보고서 위치
+
+- report/YYYY-MM-DD.json
+
+### 이미지 위치
+
+- report/images/YYYY-MM-DD/[종목명].png

@@ -1,0 +1,390 @@
+# -*- coding: utf-8 -*-
+"""
+LS증권(구 이베스트투자증권) Open API를 이용한 관심종목 스크리닝 봇
+==============================================================
+
+전체 흐름
+---------
+1. OAuth2 접근토큰 발급
+2. 업종별 지수 흐름(최근 등락률/모멘텀)을 조회해 "유망 업종" 후보를 추림
+3. 해당 업종 소속 종목들의 일봉 데이터를 받아
+   - 심리선(psychological line) 과매도 (기본 25% 이하)
+   - 볼린저밴드 하단권 (종가가 하단밴드 근접/이탈)
+   - 이동평균 5/20/60일이 "역배열 → 정배열" 로 막 전환되는 구간
+   3가지 조건을 모두 만족하는 종목을 골라 관심종목 리스트(CSV)로 저장
+4. (선택) 관심종목에 대해 실제 매수 주문(CSPAT00601) 실행
+
+※ 매우 중요 - 실행 전 반드시 확인하세요
+------------------------------------------------
+- 아래 TR 코드 중 일봉조회(t8412), 잔고조회(t0424), 현물매수주문(CSPAT00601)은
+  공식 문서/실제 서비스에서 확인된 코드입니다.
+- 반면 "업종별 등락률 상위" 조회 TR, "업종 소속 종목 리스트" 조회 TR은
+  LS증권 API가이드(로그인 필요, https://openapi.ls-sec.co.kr/apiservice)에서
+  정확한 TR명과 InBlock/OutBlock 필드명을 반드시 재확인한 뒤
+  get_top_industries() / get_stocks_in_industry() 두 함수 안의
+  TR_CD / 필드명만 교체해서 쓰세요. (주석에 TODO로 표시해 두었습니다)
+- 이 스크립트는 투자 판단을 대신하지 않습니다. 신호가 떴다고 무조건 매수하지 말고,
+  반드시 모의투자(paper trading) 서버로 먼저 검증한 뒤 실전에 적용하세요.
+- LS증권 API는 초당 요청 수 제한이 있으므로(문서 기준 초당 2회 내외) time.sleep으로
+  간격을 두었습니다. 계좌 등급에 따라 제한이 다르니 문서를 확인하세요.
+"""
+
+import json
+import time
+import logging
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+
+import requests
+import pandas as pd
+import numpy as np
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+log = logging.getLogger("ls_screener")
+
+# ----------------------------------------------------------------------------
+# 0. 설정
+# ----------------------------------------------------------------------------
+
+APP_KEY = "발급받은_APP_KEY"
+APP_SECRET = "발급받은_APP_SECRET"
+ACCOUNT_NO = "실전/모의 계좌번호"          # 매수 주문시 필요
+ACCOUNT_PWD = "계좌 비밀번호"              # 매수 주문시 필요
+
+USE_MOCK = True   # True = 모의투자 서버 사용 (반드시 True로 먼저 테스트하세요)
+
+BASE_URL = "https://openapi.ls-sec.co.kr:8080"          # 실전
+MOCK_BASE_URL = "https://openapi.ls-sec.co.kr:29443"     # 모의투자 (포트는 문서 확인 후 수정)
+
+REQUEST_INTERVAL_SEC = 0.6   # 초당 2회 제한 → 여유있게 0.6초 간격
+
+# 스크리닝 파라미터
+PSY_PERIOD = 12          # 심리선 산출 기간 (일반적으로 10~12일)
+PSY_OVERSOLD = 25        # 심리선 과매도 기준 (%)
+BB_PERIOD = 20           # 볼린저밴드 기간
+BB_STD = 2               # 볼린저밴드 표준편차 배수
+MA_SHORT, MA_MID, MA_LONG = 5, 20, 60   # 이동평균 기간
+LOOKBACK_DAYS = 120       # 일봉 조회 기간(영업일 기준 여유있게)
+
+# 매수 관련
+BUY_ENABLED = False       # True로 바꾸기 전까지는 절대 주문이 나가지 않음 (안전장치)
+BUY_AMOUNT_PER_STOCK = 500_000   # 종목당 매수 금액(원) - 시장가 매수 기준 수량 환산에 사용
+
+
+# ----------------------------------------------------------------------------
+# 1. API 클라이언트 (토큰 발급 + 공통 TR 요청)
+# ----------------------------------------------------------------------------
+
+class LSApiClient:
+    def __init__(self, app_key: str, app_secret: str, use_mock: bool = True):
+        self.app_key = app_key
+        self.app_secret = app_secret
+        self.base_url = MOCK_BASE_URL if use_mock else BASE_URL
+        self.access_token = None
+        self.token_expire_at = None
+        self._issue_token()
+
+    def _issue_token(self):
+        """OAuth2 접근토큰 발급 (grant_type=client_credentials)"""
+        url = f"{self.base_url}/oauth2/token"
+        headers = {"content-type": "application/x-www-form-urlencoded"}
+        data = {
+            "grant_type": "client_credentials",
+            "appkey": self.app_key,
+            "appsecretkey": self.app_secret,   # 문서상 파라미터명이 다를 수 있으니 401 발생 시 'appsecret'으로도 시도해보세요
+            "scope": "oob",
+        }
+        resp = requests.post(url, headers=headers, data=data, timeout=10)
+        resp.raise_for_status()
+        payload = resp.json()
+        self.access_token = payload["access_token"]
+        expires_in = int(payload.get("expires_in", 86400))
+        self.token_expire_at = datetime.now() + timedelta(seconds=expires_in - 300)
+        log.info("접근토큰 발급 완료 (만료: %s)", self.token_expire_at)
+
+    def _ensure_token(self):
+        if self.token_expire_at is None or datetime.now() >= self.token_expire_at:
+            self._issue_token()
+
+    def request(self, path: str, tr_cd: str, body: dict, tr_cont: str = "N",
+                tr_cont_key: str = "") -> dict:
+        """공통 TR 요청 함수"""
+        self._ensure_token()
+        url = f"{self.base_url}/{path}"
+        headers = {
+            "content-type": "application/json; charset=utf-8",
+            "authorization": f"Bearer {self.access_token}",
+            "tr_cd": tr_cd,
+            "tr_cont": tr_cont,
+            "tr_cont_key": tr_cont_key,
+        }
+        resp = requests.post(url, headers=headers, data=json.dumps(body), timeout=10)
+        time.sleep(REQUEST_INTERVAL_SEC)   # 요청 제한 대응
+        resp.raise_for_status()
+        result = resp.json()
+        if result.get("rsp_cd") not in (None, "00000"):
+            log.warning("[%s] 응답코드 %s: %s", tr_cd, result.get("rsp_cd"), result.get("rsp_msg"))
+        return result
+
+
+# ----------------------------------------------------------------------------
+# 2. 데이터 조회 함수
+# ----------------------------------------------------------------------------
+
+def get_top_industries(client: LSApiClient, top_n: int = 5) -> list:
+    """
+    유망 업종(등락률/모멘텀 상위) 조회.
+
+    TODO: 아래는 예시 골격입니다. LS증권 API가이드에서
+    '업종 등락률 상위' 또는 '업종별 지수' 관련 정확한 TR 코드/필드명을
+    확인해 tr_cd, path, InBlock/OutBlock 키를 맞춰주세요.
+    (예: t1514 업종 현재가, t8425 업종 코드 조회 등 문서의 '업종' 카테고리를 참고)
+    """
+    tr_cd = "t1857"   # TODO: 실제 '업종 등락률 상위' TR 코드로 교체
+    path = "stock/market-data"  # TODO: 문서에서 정확한 PATH 확인
+    body = {
+        f"{tr_cd}InBlock": {
+            "gubun": "1",     # 1: 코스피, 2: 코스닥 등 문서 확인
+            "sortgb": "2",    # 등락률 정렬 기준값 등 문서 확인
+        }
+    }
+    result = client.request(path, tr_cd, body)
+    out_key = f"{tr_cd}OutBlock1"
+    rows = result.get(out_key, [])
+
+    industries = []
+    for row in rows[:top_n]:
+        industries.append({
+            "code": row.get("upcode") or row.get("indexcode"),
+            "name": row.get("hname") or row.get("upname"),
+            "change_rate": float(row.get("diff", 0)),
+        })
+    log.info("유망 업종 후보 %d개 추출", len(industries))
+    return industries
+
+
+def get_stocks_in_industry(client: LSApiClient, industry_code: str) -> list:
+    """
+    업종 소속 종목 리스트 조회.
+
+    TODO: 실제 '업종별 종목 리스트' TR 코드로 교체 필요.
+    (문서의 '종목마스터/업종 구성종목' 카테고리 확인)
+    """
+    tr_cd = "t8424"   # TODO: 실제 TR 코드로 교체
+    path = "stock/market-data"
+    body = {f"{tr_cd}InBlock": {"upcode": industry_code}}
+    result = client.request(path, tr_cd, body)
+    out_key = f"{tr_cd}OutBlock1"
+    rows = result.get(out_key, [])
+    return [{"shcode": r.get("shcode"), "name": r.get("hname")} for r in rows]
+
+
+def get_daily_ohlcv(client: LSApiClient, shcode: str, count: int = LOOKBACK_DAYS) -> pd.DataFrame:
+    """일봉(t8412) 조회 → OHLCV DataFrame (오래된 날짜가 위로 오도록 정렬)"""
+    tr_cd = "t8412"
+    path = "stock/market-data"
+    body = {
+        "t8412InBlock": {
+            "shcode": shcode,
+            "gubun": "2",       # 2: 주식(개별종목), 0: 업종
+            "qrycnt": count,
+            "sdate": "",
+            "edate": datetime.now().strftime("%Y%m%d"),
+            "cts_date": "",
+            "comp_yn": "N",
+        }
+    }
+    result = client.request(path, tr_cd, body)
+    rows = result.get("t8412OutBlock1", [])
+    if not rows:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(rows)
+    # 필드명은 문서 기준 일반적으로 date/open/high/low/close/volume 형태입니다.
+    # 실제 응답 필드명이 다르면 아래 rename 매핑만 수정하세요.
+    df = df.rename(columns={
+        "date": "date", "open": "open", "high": "high",
+        "low": "low", "close": "close", "jdiff_vol": "volume", "volume": "volume",
+    })
+    for col in ["open", "high", "low", "close", "volume"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    df["date"] = pd.to_datetime(df["date"], format="%Y%m%d", errors="coerce")
+    df = df.sort_values("date").reset_index(drop=True)
+    return df
+
+
+# ----------------------------------------------------------------------------
+# 3. 기술적 지표 계산
+# ----------------------------------------------------------------------------
+
+def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
+    """이동평균, 볼린저밴드, 심리선을 DataFrame에 추가"""
+    if df.empty or len(df) < max(BB_PERIOD, MA_LONG, PSY_PERIOD) + 5:
+        return df
+
+    df = df.copy()
+
+    # 이동평균
+    df["ma5"] = df["close"].rolling(MA_SHORT).mean()
+    df["ma20"] = df["close"].rolling(MA_MID).mean()
+    df["ma60"] = df["close"].rolling(MA_LONG).mean()
+
+    # 볼린저밴드
+    mid = df["close"].rolling(BB_PERIOD).mean()
+    std = df["close"].rolling(BB_PERIOD).std()
+    df["bb_mid"] = mid
+    df["bb_upper"] = mid + BB_STD * std
+    df["bb_lower"] = mid - BB_STD * std
+
+    # 심리선 (Psychological Line): 최근 N일 중 전일대비 상승 마감한 날의 비율(%)
+    df["up_day"] = (df["close"].diff() > 0).astype(int)
+    df["psy"] = df["up_day"].rolling(PSY_PERIOD).sum() / PSY_PERIOD * 100
+
+    return df
+
+
+def is_reverse_array(row) -> bool:
+    """역배열: 5일선 < 20일선 < 60일선 (단기가 장기 아래)"""
+    return row["ma5"] < row["ma20"] < row["ma60"]
+
+
+def is_regular_array(row) -> bool:
+    """정배열: 5일선 > 20일선 > 60일선 (단기가 장기 위)"""
+    return row["ma5"] > row["ma20"] > row["ma60"]
+
+
+def check_signal(df: pd.DataFrame) -> dict:
+    """
+    스크리닝 조건 판정
+    1) 심리선 과매도(PSY_OVERSOLD 이하)
+    2) 종가가 볼린저밴드 하단 근접/이탈 (하단밴드의 102% 이내)
+    3) 최근 며칠 사이 이동평균이 '역배열'에서 '정배열'로 막 전환
+       (오늘은 정배열이고, 최근 10거래일 내에 역배열이었던 시점이 있었는지 확인)
+    """
+    if df.empty or len(df) < max(BB_PERIOD, MA_LONG, PSY_PERIOD) + 15:
+        return {"ok": False}
+
+    df = df.dropna(subset=["ma5", "ma20", "ma60", "bb_lower", "psy"]).reset_index(drop=True)
+    if len(df) < 15:
+        return {"ok": False}
+
+    today = df.iloc[-1]
+    recent = df.tail(10)   # 최근 10거래일 내 전환 여부 확인
+
+    cond_psy = today["psy"] <= PSY_OVERSOLD
+    cond_bb = today["close"] <= today["bb_lower"] * 1.02
+
+    cond_now_regular = is_regular_array(today)
+    was_reverse_recently = recent.iloc[:-1].apply(is_reverse_array, axis=1).any()
+    cond_ma_turn = cond_now_regular and was_reverse_recently
+
+    ok = bool(cond_psy and cond_bb and cond_ma_turn)
+    return {
+        "ok": ok,
+        "psy": round(today["psy"], 1),
+        "close": today["close"],
+        "bb_lower": round(today["bb_lower"], 1),
+        "ma5": round(today["ma5"], 1),
+        "ma20": round(today["ma20"], 1),
+        "ma60": round(today["ma60"], 1),
+        "cond_psy": cond_psy,
+        "cond_bb": cond_bb,
+        "cond_ma_turn": cond_ma_turn,
+    }
+
+
+# ----------------------------------------------------------------------------
+# 4. 매수 주문 (선택 실행)
+# ----------------------------------------------------------------------------
+
+def place_market_buy_order(client: LSApiClient, shcode: str, price: float) -> dict:
+    """
+    현물 시장가 매수 주문 (CSPAT00601)
+    BUY_ENABLED = True 로 바꾸기 전까지는 절대 호출되지 않습니다.
+    """
+    if not BUY_ENABLED:
+        log.info("[매수 스킵] BUY_ENABLED=False (안전모드) - %s", shcode)
+        return {"skipped": True}
+
+    qty = max(1, int(BUY_AMOUNT_PER_STOCK // price))
+    tr_cd = "CSPAT00601"
+    path = "stock/order"   # TODO: 문서에서 정확한 PATH 확인
+    body = {
+        "CSPAT00601InBlock1": {
+            "AcntNo": ACCOUNT_NO,
+            "InptPwd": ACCOUNT_PWD,
+            "IsuNo": f"A{shcode}",     # 종목코드 앞에 A 접두 (KOSPI/KOSDAQ 공통 표기)
+            "OrdQty": qty,
+            "OrdPrc": 0,               # 시장가는 0
+            "BnsTpCode": "2",          # 2: 매수
+            "OrdprcPtnCode": "03",     # 03: 시장가 (지정가는 00 + OrdPrc 지정)
+            "PrgmOrdprcPtnCode": "00",
+            "StslAbleYn": "0",
+            "StslOrdprcTpCode": "0",
+            "CommdaCode": "01",
+            "MgntrnCode": "000",
+            "LoanDt": "",
+            "OrdCndiTpCode": "0",
+        }
+    }
+    result = client.request(path, tr_cd, body)
+    log.info("매수 주문 결과 [%s]: %s", shcode, result.get("rsp_msg"))
+    return result
+
+
+# ----------------------------------------------------------------------------
+# 5. 메인 파이프라인
+# ----------------------------------------------------------------------------
+
+def main():
+    client = LSApiClient(APP_KEY, APP_SECRET, use_mock=USE_MOCK)
+
+    # 1) 유망 업종 후보
+    industries = get_top_industries(client, top_n=5)
+    if not industries:
+        log.warning("업종 후보를 가져오지 못했습니다. get_top_industries()의 TR 코드를 확인하세요.")
+        return
+
+    watchlist_rows = []
+
+    # 2) 업종별 종목 → 지표 계산 → 조건 스크리닝
+    for ind in industries:
+        log.info("업종 처리 중: %s (%s)", ind["name"], ind["code"])
+        stocks = get_stocks_in_industry(client, ind["code"])
+
+        for stock in stocks:
+            shcode = stock["shcode"]
+            if not shcode:
+                continue
+            try:
+                df = get_daily_ohlcv(client, shcode)
+                df = add_indicators(df)
+                signal = check_signal(df)
+            except Exception as e:
+                log.warning("종목 %s 처리 중 오류: %s", shcode, e)
+                continue
+
+            if signal.get("ok"):
+                log.info("★ 조건 충족: %s(%s) psy=%.1f close=%.0f bb_lower=%.0f",
+                          stock["name"], shcode, signal["psy"], signal["close"], signal["bb_lower"])
+                watchlist_rows.append({
+                    "industry": ind["name"],
+                    "shcode": shcode,
+                    "name": stock["name"],
+                    **{k: v for k, v in signal.items() if k != "ok"},
+                })
+
+    # 3) 관심종목 저장
+    watch_df = pd.DataFrame(watchlist_rows)
+    out_path = "/mnt/user-data/outputs/watchlist.csv"
+    watch_df.to_csv(out_path, index=False, encoding="utf-8-sig")
+    log.info("관심종목 %d개 저장 완료 → %s", len(watch_df), out_path)
+
+    # 4) (선택) 매수 실행 - BUY_ENABLED=True 로 바꾼 뒤에만 동작
+    for row in watchlist_rows:
+        place_market_buy_order(client, row["shcode"], row["close"])
+
+
+if __name__ == "__main__":
+    main()

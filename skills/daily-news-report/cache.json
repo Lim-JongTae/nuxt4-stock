@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "description": "Daily News Report 캐시 파일. 중복 수집 방지 및 이력 추적용",
+
+  "last_run": {
+    "date": "2026-01-21",
+    "duration_seconds": 180,
+    "items_collected": 20,
+    "items_published": 20,
+    "sources_used": ["hn", "hf_papers", "james_clear", "fs_blog", "scotthyoung"]
+  },
+
+  "source_stats": {
+    "_comment": "각 수집원의 이력을 기록하여 동적으로 우선순위를 조정함",
+    "hn": {
+      "total_fetches": 0,
+      "success_count": 0,
+      "avg_items_per_fetch": 0,
+      "avg_quality_score": 0,
+      "last_fetch": null,
+      "last_success": null
+    }
+  },
+
+  "url_cache": {
+    "_comment": "처리 완료된 URL 캐시 (중복 수집 방지)",
+    "_ttl_hours": 168,
+    "entries": {}
+  },
+
+  "content_hashes": {
+    "_comment": "내용 핑거프린트 (중복 제거용)",
+    "_ttl_hours": 168,
+    "entries": {}
+  },
+
+  "article_history": {
+    "_comment": "수집된 기사 요약 기록",
+    "2026-01-21": []
+  }
+}

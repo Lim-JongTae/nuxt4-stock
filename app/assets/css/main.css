@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-cyber-bg: #090d16;
+    --color-cyber-card: #0f172a;
+    --color-cyber-border: #1e293b;
+    --color-cyber-primary: #6366f1;
+    --color-cyber-secondary: #06b6d4;
+    --color-cyber-success: #10b981;
+    --color-cyber-warning: #f59e0b;
+    --color-cyber-danger: #f43f5e;
+  }
+
+  body {
+    background-color: var(--color-cyber-bg);
+    color: #f8fafc;
+    font-family: 'Plus Jakarta Sans', 'Outfit', sans-serif;
+    min-height: 100vh;
+    margin: 0;
+  }
+}
+
+/* Custom scrollbar for cyber theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #090d16;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}

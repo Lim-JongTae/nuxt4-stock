@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>주식 전망 | 아는것이 힘이다. 임종태</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-top">
+                <div class="date-selector-wrapper">
+                    <select id="date-selector" class="date-select">
+                        <!-- Options will be populated by script.js -->
+                    </select>
+                </div>
+                <div class="user-badge">아는것이 힘이다. 임종태</div>
+            </div>
+            <h1>Finance Report-임종태</h1>
+            <p id="report-overview">보고서 데이터를 불러오는 중입니다...</p>
+        </header>
+
+        <div class="dashboard-grid">
+            <!-- 보유 종목 -->
+            <div class="card" style="animation-delay: 0.1s;">
+                <div class="section-label">Current Portfolio</div>
+                <div class="card-title">보유 종목 현황-</div>
+                <div id="holdings-list" class="stock-list">
+                    <!-- Dynamic Content -->
+                    <p style="color: var(--text-secondary);">데이터 로딩 중...</p>
+                </div>
+            </div>
+
+            <!-- 관심 종목 -->
+            <div class="card" style="animation-delay: 0.2s;">
+                <div class="section-label">Market Watchlist</div>
+                <div class="card-title">관심 종목 분석</div>
+                <div id="watchlist-list" class="stock-list">
+                    <!-- Dynamic Content -->
+                    <p style="color: var(--text-secondary);">데이터 로딩 중...</p>
+                </div>
+            </div>
+
+            <!-- 투자 조언 -->
+            <div class="card advice-section" style="animation-delay: 0.3s;">
+                <div class="section-label">Strategy Advice</div>
+                <div class="card-title">종합 투자 조언</div>
+                <div class="advice-text">
+                    <!-- Dynamic Content -->
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="data.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
