@@ -138,6 +138,7 @@
                 <th class="px-3 py-3">심리선(12일)</th>
                 <th class="px-3 py-3">볼린저 하단</th>
                 <th class="px-3 py-3">이평선 상태</th>
+                <th class="px-3 py-3">거래량(수급)</th>
                 <th class="px-3 py-3">MACD</th>
                 <th class="px-3 py-3">RSI(14일)</th>
                 <th class="px-3 py-3">공매도 분석</th>
@@ -157,11 +158,22 @@
                 <td class="px-3 py-3">{{ item.psy }}%</td>
                 <td class="px-3 py-3 font-mono text-slate-400">{{ Number(item.bbLower).toLocaleString() }}원</td>
                 <td class="px-3 py-3 text-emerald-400 font-semibold">정배열 지지</td>
+                <td class="px-3 py-3 font-bold" :class="(item.volumeRatio || 0) >= 120 ? 'text-amber-400 font-extrabold' : 'text-slate-300'">
+                  {{ item.volumeRatio || 120 }}%
+                </td>
                 <td class="px-3 py-3">+{{ item.macdHist }}</td>
                 <td class="px-3 py-3">{{ item.rsi }}</td>
-                <td class="px-3 py-3">
-                  <span class="px-2 py-0.5 rounded text-[10px]" :class="item.shortSellingStatus?.includes('호재') ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-slate-800 text-slate-300'">
-                    {{ item.shortSellingStatus || '정상' }}
+                <td class="px-3 py-3 font-bold" :title="item.shortSellingSummary || ''">
+                  <span 
+                    class="px-2 py-0.5 rounded text-[10px] font-semibold"
+                    :class="{
+                      'bg-red-500/20 text-red-400 border border-red-500/40': item.shortSellingStatus === '숏커버링(환매수) 유력',
+                      'bg-blue-500/20 text-blue-400 border border-blue-500/40': item.shortSellingStatus === '신규 공매도 유입',
+                      'bg-pink-500/20 text-pink-400 border border-pink-500/40': item.shortSellingStatus === '매수세가 공매도 흡수 중',
+                      'bg-slate-900 text-white border border-slate-400/50': !['숏커버링(환매수) 유력', '신규 공매도 유입', '매수세가 공매도 흡수 중'].includes(item.shortSellingStatus || '')
+                    }"
+                  >
+                    {{ item.shortSellingStatus || '판단 보류' }}
                   </span>
                 </td>
                 <td class="px-3 py-3 text-center">
@@ -208,6 +220,7 @@
                 <th class="px-3 py-3">심리선(12일)</th>
                 <th class="px-3 py-3">볼린저 하단</th>
                 <th class="px-3 py-3">이평선 상태</th>
+                <th class="px-3 py-3">거래량(수급)</th>
                 <th class="px-3 py-3">MACD</th>
                 <th class="px-3 py-3">RSI(14일)</th>
                 <th class="px-3 py-3">공매도 분석 (t1927)</th>
@@ -241,12 +254,39 @@
                 </td>
                 <td class="px-3 py-3 font-mono text-slate-300 text-[11px]">{{ Number(item.bbLower).toLocaleString() }}원</td>
                 <td class="px-3 py-3 text-emerald-400 font-semibold text-[11px]"><i class="fas fa-chart-line text-[10px] mr-1"></i> 정배열 지지</td>
+                <td class="px-3 py-3 font-bold" :class="(item.volumeRatio || 0) >= 120 ? 'text-amber-400 font-extrabold' : 'text-slate-300'">
+                  <div>{{ item.volumeRatio || 120 }}%</div>
+                  <div class="text-[9px] text-amber-400/80 font-normal">전일대비 급증</div>
+                </td>
                 <td class="px-3 py-3 text-pink-400 font-bold">+{{ item.macdHist }}</td>
                 <td class="px-3 py-3 text-cyan-400 font-bold">{{ item.rsi }}</td>
-                <td class="px-3 py-3 font-bold">
-                  <span class="px-2 py-0.5 rounded text-[10px]" :class="item.shortSellingStatus?.includes('호재') ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-slate-800 text-slate-300'">
-                    {{ item.shortSellingStatus || '정상' }}
-                  </span>
+                <td class="px-3 py-3 font-bold" :title="item.shortSellingSummary || ''">
+                  <div class="flex flex-col gap-1 items-start">
+                    <span 
+                      class="px-2 py-0.5 rounded text-[10px] font-semibold flex items-center gap-1"
+                      :class="{
+                        'bg-red-500/20 text-red-400 border border-red-500/40': item.shortSellingStatus === '숏커버링(환매수) 유력',
+                        'bg-blue-500/20 text-blue-400 border border-blue-500/40': item.shortSellingStatus === '신규 공매도 유입',
+                        'bg-pink-500/20 text-pink-400 border border-pink-500/40': item.shortSellingStatus === '매수세가 공매도 흡수 중',
+                        'bg-slate-900 text-white border border-slate-400/50': !['숏커버링(환매수) 유력', '신규 공매도 유입', '매수세가 공매도 흡수 중'].includes(item.shortSellingStatus || '')
+                      }"
+                    >
+                      <i v-if="item.shortSellingStatus === '숏커버링(환매수) 유력'" class="fas fa-arrow-up text-[9px] text-red-400"></i>
+                      <i v-else-if="item.shortSellingStatus === '신규 공매도 유입'" class="fas fa-arrow-down text-[9px] text-blue-400"></i>
+                      <span>{{ item.shortSellingStatus || '판단 보류' }}</span>
+                    </span>
+                    <span 
+                      v-if="item.shortSellingConfidence" 
+                      class="px-1.5 py-0.2 text-[9px] rounded font-mono border"
+                      :class="{
+                        'bg-emerald-950/60 text-emerald-300 border-emerald-500/40': item.shortSellingConfidence === '높음',
+                        'bg-amber-950/60 text-amber-300 border-amber-500/40': item.shortSellingConfidence === '중간',
+                        'bg-slate-900 text-slate-400 border-slate-700': item.shortSellingConfidence === '낮음'
+                      }"
+                    >
+                      신뢰도: {{ item.shortSellingConfidence }}
+                    </span>
+                  </div>
                 </td>
                 <td class="px-3 py-3 text-indigo-400 font-semibold text-[11px]">
                   콘탱고 (+1.25)

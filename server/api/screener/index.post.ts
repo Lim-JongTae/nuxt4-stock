@@ -3,6 +3,7 @@ import { screenerHistory } from '../../db/schema';
 import { desc, eq } from 'drizzle-orm';
 import fs from 'fs';
 import path from 'path';
+import { classifyShortSellSignal, type ShortSellRecord } from '../../utils/shortSellSignal';
 
 // Helper to read .env
 function loadEnv() {
@@ -91,8 +92,10 @@ export default defineEventHandler(async (event) => {
           macd_hist: s.macd_hist || 50,
           rsi: s.rsi || 31.0,
           bullish_divergence: s.bullish_divergence !== undefined ? s.bullish_divergence : true,
-          short_selling_status: s.short_selling_status || '정상',
-          market_basis: s.market_basis || '콘탱고 (+1.25)'
+          shortSellHistory: s.shortSellHistory || [
+            { date: "2026-08-11", balanceRatio: 3.2, price: (s.close || 10000) * 0.98, volume: 1200000 },
+            { date: "2026-08-12", balanceRatio: 2.8, price: (s.close || 10000), volume: 1800000 }
+          ]
         }));
       }
     } catch (e) {}
@@ -100,15 +103,15 @@ export default defineEventHandler(async (event) => {
 
   if (candidateStocks.length === 0) {
     candidateStocks = [
-      { industry: "전기전자", shcode: "005930", name: "삼성전자", close: 249000, psy: 25.0, bb_lower: 247663, ma5: 247997, ma20: 247329, ma60: 245658, volume_ratio: 135.0, macd_hist: 125, rsi: 31.5, bullish_divergence: true, short_selling_status: "호재(숏커버링 유입)" },
-      { industry: "IT부품/반도체", shcode: "000660", name: "SK하이닉스", close: 1451000, psy: 16.7, bb_lower: 1439392, ma5: 1447041, ma20: 1435164, ma60: 1400522, volume_ratio: 128.5, macd_hist: 450, rsi: 29.2, bullish_divergence: true, short_selling_status: "호재(숏커버링 유입)" },
-      { industry: "바이오/제약", shcode: "068270", name: "셀트리온", close: 207000, psy: 25.0, bb_lower: 206461, ma5: 206784, ma20: 204844, ma60: 202688, volume_ratio: 142.0, macd_hist: 85, rsi: 32.0, bullish_divergence: true, short_selling_status: "호재(숏커버링 유입)" },
-      { industry: "인공지능/피지컬AI", shcode: "A0186L0", name: "KoAct 미국로봇피지컬AI액티브", close: 9720, psy: 25.0, bb_lower: 9620, ma5: 9860, ma20: 9780, ma60: 9471, volume_ratio: 125.0, macd_hist: 15, rsi: 30.5, bullish_divergence: true, short_selling_status: "정상" },
-      { industry: "우주항공/방산", shcode: "A0167Z0", name: "KODEX 미국우주항공", close: 8700, psy: 33.3, bb_lower: 7840, ma5: 7840, ma20: 7546, ma60: 7320, volume_ratio: 135.0, macd_hist: -10, rsi: 38.5, bullish_divergence: false, short_selling_status: "정상" },
-      { industry: "전력인프라", shcode: "A475070", name: "KoAct 글로벌친환경전력인프라액티브", close: 31675, psy: 25.0, bb_lower: 31378, ma5: 31931, ma20: 30624, ma60: 29669, volume_ratio: 122.0, macd_hist: 45, rsi: 31.0, bullish_divergence: true, short_selling_status: "정상" },
-      { industry: "AI소프트웨어", shcode: "A481180", name: "SOL 미국AI소프트웨어", close: 16525, psy: 25.0, bb_lower: 16396, ma5: 16582, ma20: 15860, ma60: 15262, volume_ratio: 130.0, macd_hist: 28, rsi: 29.8, bullish_divergence: true, short_selling_status: "정상" },
-      { industry: "빅테크/디지털", shcode: "035420", name: "NAVER", close: 217500, psy: 16.7, bb_lower: 215734, ma5: 216995, ma20: 215103, ma60: 211949, volume_ratio: 126.4, macd_hist: 110, rsi: 28.5, bullish_divergence: true, short_selling_status: "호재(숏커버링 유입)" },
-      { industry: "자동차/모빌리티", shcode: "005380", name: "현대차", close: 407500, psy: 25.0, bb_lower: 404990, ma5: 406663, ma20: 401643, ma60: 394949, volume_ratio: 121.0, macd_hist: 160, rsi: 33.0, bullish_divergence: true, short_selling_status: "호재(숏커버링 유입)" }
+      { industry: "전기전자", shcode: "005930", name: "삼성전자", close: 249000, psy: 25.0, bb_lower: 247663, ma5: 247997, ma20: 247329, ma60: 245658, volume_ratio: 135.0, macd_hist: 125, rsi: 31.5, bullish_divergence: true, shortSellHistory: [{ date: "2026-08-11", balanceRatio: 3.2, price: 244000, volume: 1200000 }, { date: "2026-08-12", balanceRatio: 2.8, price: 249000, volume: 1800000 }] },
+      { industry: "IT부품/반도체", shcode: "000660", name: "SK하이닉스", close: 1451000, psy: 16.7, bb_lower: 1439392, ma5: 1447041, ma20: 1435164, ma60: 1400522, volume_ratio: 128.5, macd_hist: 450, rsi: 29.2, bullish_divergence: true, shortSellHistory: [{ date: "2026-08-11", balanceRatio: 4.1, price: 1410000, volume: 800000 }, { date: "2026-08-12", balanceRatio: 3.5, price: 1451000, volume: 1300000 }] },
+      { industry: "바이오/제약", shcode: "068270", name: "셀트리온", close: 207000, psy: 25.0, bb_lower: 206461, ma5: 206784, ma20: 204844, ma60: 202688, volume_ratio: 142.0, macd_hist: 85, rsi: 32.0, bullish_divergence: true, shortSellHistory: [{ date: "2026-08-11", balanceRatio: 2.5, price: 202000, volume: 500000 }, { date: "2026-08-12", balanceRatio: 2.1, price: 207000, volume: 950000 }] },
+      { industry: "인공지능/피지컬AI", shcode: "A0186L0", name: "KoAct 미국로봇피지컬AI액티브", close: 9720, psy: 25.0, bb_lower: 9620, ma5: 9860, ma20: 9780, ma60: 9471, volume_ratio: 125.0, macd_hist: 15, rsi: 30.5, bullish_divergence: true, shortSellHistory: [{ date: "2026-08-11", balanceRatio: 0.5, price: 9800, volume: 300000 }, { date: "2026-08-12", balanceRatio: 0.5, price: 9720, volume: 280000 }] },
+      { industry: "우주항공/방산", shcode: "A0167Z0", name: "KODEX 미국우주항공", close: 8700, psy: 33.3, bb_lower: 7840, ma5: 7840, ma20: 7546, ma60: 7320, volume_ratio: 135.0, macd_hist: -10, rsi: 38.5, bullish_divergence: false, shortSellHistory: [{ date: "2026-08-11", balanceRatio: 1.2, price: 8900, volume: 400000 }, { date: "2026-08-12", balanceRatio: 1.5, price: 8700, volume: 380000 }] },
+      { industry: "전력인프라", shcode: "A475070", name: "KoAct 글로벌친환경전력인프라액티브", close: 31675, psy: 25.0, bb_lower: 31378, ma5: 31931, ma20: 30624, ma60: 29669, volume_ratio: 122.0, macd_hist: 45, rsi: 31.0, bullish_divergence: true, shortSellHistory: [{ date: "2026-08-11", balanceRatio: 0.8, price: 31000, volume: 200000 }, { date: "2026-08-12", balanceRatio: 0.7, price: 31675, volume: 310000 }] },
+      { industry: "AI소프트웨어", shcode: "A481180", name: "SOL 미국AI소프트웨어", close: 16525, psy: 25.0, bb_lower: 16396, ma5: 16582, ma20: 15860, ma60: 15262, volume_ratio: 130.0, macd_hist: 28, rsi: 29.8, bullish_divergence: true, shortSellHistory: [{ date: "2026-08-11", balanceRatio: 1.0, price: 16200, volume: 150000 }, { date: "2026-08-12", balanceRatio: 0.9, price: 16525, volume: 220000 }] },
+      { industry: "빅테크/디지털", shcode: "035420", name: "NAVER", close: 217500, psy: 16.7, bb_lower: 215734, ma5: 216995, ma20: 215103, ma60: 211949, volume_ratio: 126.4, macd_hist: 110, rsi: 28.5, bullish_divergence: true, shortSellHistory: [{ date: "2026-08-11", balanceRatio: 3.8, price: 212000, volume: 600000 }, { date: "2026-08-12", balanceRatio: 3.1, price: 217500, volume: 920000 }] },
+      { industry: "자동차/모빌리티", shcode: "005380", name: "현대차", close: 407500, psy: 25.0, bb_lower: 404990, ma5: 406663, ma20: 401643, ma60: 394949, volume_ratio: 121.0, macd_hist: 160, rsi: 33.0, bullish_divergence: true, shortSellHistory: [{ date: "2026-08-11", balanceRatio: 2.9, price: 401000, volume: 500000 }, { date: "2026-08-12", balanceRatio: 2.3, price: 407500, volume: 750000 }] }
     ];
   }
 
@@ -163,6 +166,9 @@ export default defineEventHandler(async (event) => {
     const cond_macd = (s.macd_hist || 0) > 0;
     const cond_rsi = (s.rsi || 50) <= 35.0;
 
+    // 공매도 신호 분류기 실행
+    const shortSignal = classifyShortSellSignal(s.shortSellHistory || []);
+
     let score = 0;
     if (cond_psy) score += 15;
     if (cond_bb) score += 15;
@@ -188,7 +194,10 @@ export default defineEventHandler(async (event) => {
       macdHist: s.macd_hist,
       rsi: s.rsi,
       bullishDivergence: s.bullish_divergence,
-      shortSellingStatus: s.short_selling_status || '정상',
+      shortSellingStatus: shortSignal.label,
+      shortSellingConfidence: shortSignal.confidence,
+      shortSellingSummary: shortSignal.summary,
+      shortSellMetrics: shortSignal.metrics,
       score,
       isFullyMatched: is_fully_matched,
       createdAt: localTime

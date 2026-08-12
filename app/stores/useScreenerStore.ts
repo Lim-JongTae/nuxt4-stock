@@ -17,6 +17,13 @@ export interface StockItem {
   rsi: number;
   bullishDivergence: boolean;
   shortSellingStatus?: string;
+  shortSellingConfidence?: string;
+  shortSellingSummary?: string;
+  shortSellMetrics?: {
+    balanceRatioDiff: number;
+    priceDiffRate: number;
+    volumeDiffRate: number;
+  } | null;
   score: number; // 0~100 퀀트 점수
   isFullyMatched: boolean;
   createdAt: string;
