@@ -1,11 +1,12 @@
 ---
 name: ls-stock-screener
-description: LS증권 Open API를 연동하여 유망 업종 및 기술적 6대 지표(심리선 과매도, 볼린저밴드 하단, 이평선 정배열 전환, 거래량 증가, MACD 반전, RSI 과매도 탈출) 조건 충족 관심종목을 자동 스크리닝하고 루트 watchlist.csv/json 덮어쓰기 및 report/csv/ 폴더에 타임스탬프 CSV 파일로 히스토리 저장하는 스킬
+description: LS증권 Open API를 연동하여 핵심 상위 유망 업종 3가지를 선별하고 6대 기술적 지표(심리선 과매도, 볼린저밴드 하단, 이평선 정배열 전환, 거래량 증가, MACD 반전, RSI 과매도 탈출) 조건 충족 관심종목을 자동 스크리닝하여 watchlist.csv/json 및 report/csv/ 폴더에 저장하는 스킬
 ---
 
-# 📈 LS증권 Open API 관심종목 스크리너 스킬
+# 📈 LS증권 Open API 상위 3대 유망업종 관심종목 스크리너 스킬
 
-본 스킬은 LS증권 Open API 및 시세 데이터를 기반으로 유망 업종 및 관심 종목에 대한 기술적 6대 조건 매수 타점을 자동 분석하여 루트 `watchlist.csv`와 `watchlist.json`으로 덮어쓰기 저장하고, `report/csv/` 폴더에 조회 일시 기준 파일명(`YYYY-MM-DD_HHmmss.csv`)으로 이력을 누적 저장합니다.
+본 스킬은 LS증권 Open API를 기반으로 **핵심 상위 유망 업종 3가지**를 엄선하고, 해당 3개 업종 내 종목에 대해 6대 기술적 매수 타점을 분석하여 루트 `watchlist.csv` 및 `watchlist.json`으로 저장합니다.
+
 
 ## 🎯 6대 기술적 지표 스크리닝 조건
 

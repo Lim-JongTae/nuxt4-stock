@@ -24,7 +24,7 @@
         </span>
 
         <button 
-          @click="portfolioStore.fetchHoldings()" 
+          @click="portfolioStore.refreshPrices()" 
           :disabled="portfolioStore.isLoading"
           class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-500/20 flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
         >
@@ -40,6 +40,15 @@
           </strong>
         </div>
       </div>
+    </div>
+
+    <!-- Error Alert Banner -->
+    <div v-if="portfolioStore.errorMessage" class="bg-rose-950/80 border border-rose-500/50 p-4 rounded-xl flex items-center justify-between text-rose-300 text-xs shadow-lg">
+      <div class="flex items-center gap-2">
+        <i class="fas fa-exclamation-triangle text-rose-400 text-sm"></i>
+        <span><strong>연동 상태 경고:</strong> {{ portfolioStore.errorMessage }}</span>
+      </div>
+      <button @click="portfolioStore.errorMessage = null" class="text-rose-400 hover:text-rose-200 font-bold px-2">✕</button>
     </div>
 
     <!-- Holdings Cards & Table List -->
@@ -83,11 +92,17 @@
                 {{ getPnl(item).rate >= 0 ? '+' : '' }}{{ getPnl(item).rate }}%
               </td>
 
-              <!-- Dynamic 3-Tier Sell Protection Guidelines -->
+              <!-- Dynamic Tech & AI Protection Guidelines -->
               <td class="px-4 py-3.5 text-[11px] space-y-0.5">
-                <div class="text-rose-400">💰 목표가: <strong>{{ Math.round(item.avgPrice * 1.08).toLocaleString() }}원 (+8%)</strong></div>
-                <div class="text-amber-400">🛡️ 트레일링: <strong>고점 대비 -3.0%</strong></div>
-                <div class="text-emerald-400">🚨 손절가: <strong>{{ Math.round(item.avgPrice * 0.955).toLocaleString() }}원 (-4.5%)</strong></div>
+                <div class="text-rose-400">
+                  💰 목표가: <strong>{{ (item.targetPrice || Math.round(item.currentPrice * 1.075)).toLocaleString() }}원 ({{ (((item.targetPrice || Math.round(item.currentPrice * 1.075)) - item.currentPrice) / item.currentPrice * 100).toFixed(1) >= 0 ? '+' : '' }}{{ (((item.targetPrice || Math.round(item.currentPrice * 1.075)) - item.currentPrice) / item.currentPrice * 100).toFixed(1) }}%)</strong>
+                </div>
+                <div class="text-amber-400">
+                  🛡️ 트레일링: <strong>고점 대비 -{{ item.trailingRate || 2.5 }}%</strong>
+                </div>
+                <div class="text-emerald-400">
+                  🚨 손절가: <strong>{{ (item.stopLossPrice || Math.round(item.currentPrice * 0.95)).toLocaleString() }}원 ({{ (((item.stopLossPrice || Math.round(item.currentPrice * 0.95)) - item.currentPrice) / item.currentPrice * 100).toFixed(1) }}%)</strong>
+                </div>
               </td>
 
               <!-- AI Diagnosis Trigger -->

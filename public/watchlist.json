@@ -1,0 +1,18 @@
+{
+  "holdings": [
+    {
+      "shcode": "0186L0",
+      "name": "로봇산업",
+      "quantity": 100,
+      "avgPrice": 9200,
+      "purchaseDate": "2024-01-01"
+    }
+  ],
+  "watchlist": [
+    {
+      "shcode": "0155Z0",
+      "name": "우주항공",
+      "industry": "우주항공/방산"
+    }
+  ]
+}

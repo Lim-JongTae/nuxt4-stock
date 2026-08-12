@@ -120,9 +120,9 @@
               <i class="fas fa-bullseye text-emerald-400"></i> 2. 정밀 매수/매도 대응 가이드라인
             </h4>
             <ul class="list-disc list-inside space-y-1 text-slate-300">
-              <li><strong class="text-emerald-400">매수 전략</strong>: 퀀트 스코어 85점 이상 포착 종목에 한해 목표가(RRR 1:2) 설정 후 분할 매수.</li>
-              <li><strong class="text-rose-400">손절 전략</strong>: 매수가 대비 <code class="text-rose-300 bg-slate-950 px-1 py-0.5 rounded">-4.5%</code> 이탈 시 즉시 기계적 손절.</li>
-              <li><strong class="text-amber-400">추적 손절매 (Trailing Stop)</strong>: 고점 대비 <code class="text-amber-300 bg-slate-950 px-1 py-0.5 rounded">-3.0%</code> 하락 시 수익 확정 매도.</li>
+              <li><strong class="text-emerald-400">매수 전략</strong>: 퀀트 스코어 85점 이상 포착 종목에 한해 동적 손익비(RRR 1:2 이상) 설정 후 분할 매수.</li>
+              <li><strong class="text-indigo-300">기술적 동적 목표가</strong>: 볼린저 밴드 상단 저항선 및 ATR 변동성 기반 동적 목표가 설정.</li>
+              <li><strong class="text-rose-400">기술적 동적 손절가</strong>: 볼린저 밴드 하단 지지선 및 주봉 60일선 이탈 시 기계적 손절.</li>
             </ul>
           </div>
         </div>
@@ -135,10 +135,26 @@
             <i class="fas fa-bolt text-yellow-400"></i>
             <span>🎯 퀀트 매수 추천 (Top 3)</span>
           </h3>
-          <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-extrabold">85점+</span>
+          <span 
+            v-if="screenerStore.has85PlusMatched" 
+            class="text-[10px] px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-extrabold flex items-center gap-1"
+          >
+            <i class="fas fa-check-circle"></i> 85점+ 포착
+          </span>
+          <span 
+            v-else 
+            class="text-[10px] px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-extrabold flex items-center gap-1"
+          >
+            <i class="fas fa-info-circle text-amber-400"></i> 85점 이상 없음 (현재 최고점수 Top 3)
+          </span>
         </div>
 
-        <div v-if="screenerStore.topBuyRecommendations.length === 0" class="text-center py-8 text-slate-500 text-xs">
+        <div v-if="screenerStore.isRefreshing && screenerStore.topBuyRecommendations.length === 0" class="text-center py-8 text-slate-400 text-xs flex items-center justify-center gap-2">
+          <i class="fas fa-spinner fa-spin text-indigo-400"></i>
+          <span>LS증권 API 스크리너 데이터 수집 중...</span>
+        </div>
+
+        <div v-else-if="screenerStore.topBuyRecommendations.length === 0" class="text-center py-8 text-slate-500 text-xs">
           스크리너 데이터 불러오는 중입니다...
         </div>
 

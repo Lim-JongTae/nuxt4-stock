@@ -36,6 +36,11 @@
           <span class="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono">LIVE</span>
         </NuxtLink>
 
+        <NuxtLink to="/watchlist" active-class="bg-indigo-600/20 text-indigo-400 border-indigo-500/40 shadow-inner" class="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800/60 border border-transparent transition-all flex items-center gap-2">
+          <i class="fas fa-star text-indigo-400"></i>
+          <span>관심종목</span>
+        </NuxtLink>
+
         <NuxtLink 
           to="/portfolio" 
           active-class="bg-purple-600/20 text-purple-400 border-purple-500/40 shadow-inner"

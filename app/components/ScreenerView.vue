@@ -8,13 +8,13 @@
             <span class="px-2.5 py-0.5 rounded-md bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 font-bold text-xs">
               <i class="fas fa-search-dollar mr-1"></i> LS증권 API 퀀트 스크리너
             </span>
-            <span class="text-xs text-slate-400">유망업종 & 6대 기술적 지표 매수타점</span>
+            <span class="text-xs text-slate-400">상위 3대 유망업종 & 8대 종합 지표 (공매도 + 선물/옵션 시장 방향성)</span>
           </div>
           <h2 class="text-xl font-extrabold text-white">
-            유망업종 관심종목 발굴 & 실시간 비교 뷰 (`watchlist.csv` / `watchlist.json`)
+            상위 3대 유망업종 관심종목 8대 지표 정밀 검증 (`watchlist.csv` / `watchlist.json`)
           </h2>
-          <p class="text-xs text-emerald-400 mt-1 bg-slate-950/70 border border-emerald-500/30 ">
-            심리선 과매도 + 볼린저 하단 수렴 + 이평선 정배열 + 거래량 수급 + MACD 양전 + RSI 과매도 탈출 6가지 조건을 100점 만점으로 수치화합니다.
+          <p class="text-xs text-emerald-400 mt-1 bg-slate-950/70 border border-emerald-500/30 p-2 rounded-lg">
+            심리선 + 볼린저하단 + 이평선정배열 + 거래량 + MACD + RSI + 공매도/숏커버링 + KOSPI200 선물 베이시스 8가지 지표를 종합 판단합니다.
           </p>
         </div>
 
@@ -24,37 +24,37 @@
           class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-500/20 flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
         >
           <i class="fas" :class="screenerStore.isRefreshing ? 'fa-spinner fa-spin' : 'fa-sync-alt'"></i>
-          <span>{{ screenerStore.isRefreshing ? 'LS증권 API 시세 분석 중...' : '실시간 스크리너 데이터 갱신' }}</span>
+          <span>{{ screenerStore.isRefreshing ? 'LS증권 API 시세 분석 중...' : '실시간 8대 지표 데이터 갱신' }}</span>
         </button>
       </div>
 
-      <!-- 6 Technical Criteria Cards Summary -->
-      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-2 border-t border-slate-800">
-        <div class="bg-slate-950/70 border border-purple-500/30 p-2.5 rounded-xl space-y-1">
+      <!-- 8 Technical & Market Criteria Cards Summary -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 pt-2 border-t border-slate-800">
+        <div class="bg-slate-950/70 border border-purple-500/30 p-2 rounded-xl space-y-1">
           <div class="text-[11px] font-bold text-purple-400 flex items-center justify-between">
             <span>1. 심리선(PSY)</span>
             <span class="px-1 py-0.5 rounded bg-purple-500/20 text-[9px]">25% 이하</span>
           </div>
-          <p class="text-[10px] text-slate-400">12일 상승비율 과매도</p>
+          <p class="text-[10px] text-slate-400">12일 침체 과매도</p>
         </div>
 
-        <div class="bg-slate-950/70 border border-blue-500/30 p-2.5 rounded-xl space-y-1">
+        <div class="bg-slate-950/70 border border-blue-500/30 p-2 rounded-xl space-y-1">
           <div class="text-[11px] font-bold text-blue-400 flex items-center justify-between">
             <span>2. 볼린저 하단</span>
             <span class="px-1 py-0.5 rounded bg-blue-500/20 text-[9px]">102% 이내</span>
           </div>
-          <p class="text-[10px] text-slate-400">20일 2SD 하단 밴드 수렴</p>
+          <p class="text-[10px] text-slate-400">20일 2SD 하단 지지</p>
         </div>
 
-        <div class="bg-slate-950/70 border border-emerald-500/30 p-2.5 rounded-xl space-y-1">
+        <div class="bg-slate-950/70 border border-emerald-500/30 p-2 rounded-xl space-y-1">
           <div class="text-[11px] font-bold text-emerald-400 flex items-center justify-between">
             <span>3. 이평선 전환</span>
             <span class="px-1 py-0.5 rounded bg-emerald-500/20 text-[9px]">5/20/60일</span>
           </div>
-          <p class="text-[10px] text-slate-400">단기 이평 정배열 전환</p>
+          <p class="text-[10px] text-slate-400">단기 정배열 초기</p>
         </div>
 
-        <div class="bg-slate-950/70 border border-amber-500/30 p-2.5 rounded-xl space-y-1">
+        <div class="bg-slate-950/70 border border-amber-500/30 p-2 rounded-xl space-y-1">
           <div class="text-[11px] font-bold text-amber-400 flex items-center justify-between">
             <span>4. 거래량 수급</span>
             <span class="px-1 py-0.5 rounded bg-amber-500/20 text-[9px]">120% 이상</span>
@@ -62,22 +62,47 @@
           <p class="text-[10px] text-slate-400">전일 대비 수급 급증</p>
         </div>
 
-        <div class="bg-slate-950/70 border border-pink-500/30 p-2.5 rounded-xl space-y-1">
+        <div class="bg-slate-950/70 border border-pink-500/30 p-2 rounded-xl space-y-1">
           <div class="text-[11px] font-bold text-pink-400 flex items-center justify-between">
             <span>5. MACD 반전</span>
-            <span class="px-1 py-0.5 rounded bg-pink-500/20 text-[9px]">양전/다이버전스</span>
+            <span class="px-1 py-0.5 rounded bg-pink-500/20 text-[9px]">양전/골든</span>
           </div>
-          <p class="text-[10px] text-slate-400">오실레이터 상승 다이버전스</p>
+          <p class="text-[10px] text-slate-400">오실레이터 상승</p>
         </div>
 
-        <div class="bg-slate-950/70 border border-cyan-500/30 p-2.5 rounded-xl space-y-1">
+        <div class="bg-slate-950/70 border border-cyan-500/30 p-2 rounded-xl space-y-1">
           <div class="text-[11px] font-bold text-cyan-400 flex items-center justify-between">
             <span>6. RSI 탈출</span>
             <span class="px-1 py-0.5 rounded bg-cyan-500/20 text-[9px]">30선 돌파</span>
           </div>
-          <p class="text-[10px] text-slate-400">RSI(14일) 30 이하 반등</p>
+          <p class="text-[10px] text-slate-400">RSI(14일) 반등</p>
+        </div>
+
+        <div class="bg-slate-950/70 border border-rose-500/30 p-2 rounded-xl space-y-1">
+          <div class="text-[11px] font-bold text-rose-400 flex items-center justify-between">
+            <span>7. 공매도 분석</span>
+            <span class="px-1 py-0.5 rounded bg-rose-500/20 text-[9px]">t1927</span>
+          </div>
+          <p class="text-[10px] text-slate-400">숏커버링 vs 경계</p>
+        </div>
+
+        <div class="bg-slate-950/70 border border-indigo-500/30 p-2 rounded-xl space-y-1">
+          <div class="text-[11px] font-bold text-indigo-400 flex items-center justify-between">
+            <span>8. 시장 방향성</span>
+            <span class="px-1 py-0.5 rounded bg-indigo-500/20 text-[9px]">t2111/t2424</span>
+          </div>
+          <p class="text-[10px] text-slate-400">베이시스/OI/프로그램</p>
         </div>
       </div>
+    </div>
+
+    <!-- Error Alert Banner -->
+    <div v-if="screenerStore.errorMessage" class="bg-rose-950/80 border border-rose-500/50 p-4 rounded-xl flex items-center justify-between text-rose-300 text-xs shadow-lg">
+      <div class="flex items-center gap-2">
+        <i class="fas fa-exclamation-triangle text-rose-400 text-sm"></i>
+        <span><strong>LS증권 API 연동 상태 경고:</strong> {{ screenerStore.errorMessage }}</span>
+      </div>
+      <button @click="screenerStore.errorMessage = null" class="text-rose-400 hover:text-rose-200 font-bold px-2">✕</button>
     </div>
 
     <!-- Dual Comparison Layout: OLD (Top) vs NEW (Bottom) -->
@@ -113,9 +138,9 @@
                 <th class="px-3 py-3">심리선(12일)</th>
                 <th class="px-3 py-3">볼린저 하단</th>
                 <th class="px-3 py-3">이평선 상태</th>
-                <th class="px-3 py-3">MACD 오실레이터</th>
+                <th class="px-3 py-3">MACD</th>
                 <th class="px-3 py-3">RSI(14일)</th>
-                <th class="px-3 py-3">거래량 비율</th>
+                <th class="px-3 py-3">공매도 분석</th>
                 <th class="px-3 py-3 text-center">이전 퀀트 스코어</th>
               </tr>
             </thead>
@@ -134,7 +159,11 @@
                 <td class="px-3 py-3 text-emerald-400 font-semibold">정배열 지지</td>
                 <td class="px-3 py-3">+{{ item.macdHist }}</td>
                 <td class="px-3 py-3">{{ item.rsi }}</td>
-                <td class="px-3 py-3">{{ item.volumeRatio }}%</td>
+                <td class="px-3 py-3">
+                  <span class="px-2 py-0.5 rounded text-[10px]" :class="item.shortSellingStatus?.includes('호재') ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-slate-800 text-slate-300'">
+                    {{ item.shortSellingStatus || '정상' }}
+                  </span>
+                </td>
                 <td class="px-3 py-3 text-center">
                   <span class="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300 font-bold">
                     {{ item.score }}점 / 100점
@@ -146,14 +175,14 @@
         </div>
       </div>
 
-      <!-- 2. NEW Section (Bottom): 실시간 갱신 관심종목 -->
+      <!-- 2. NEW Section (Bottom): 실시간 8대 지표 포착 관심종목 -->
       <div class="bg-slate-900/70 border border-indigo-500/40 rounded-2xl p-4 space-y-3 shadow-xl relative overflow-hidden">
         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-500/30 pb-2.5">
           <div class="flex items-center gap-2">
             <span class="px-2.5 py-1 rounded-md bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-extrabold text-xs flex items-center gap-1.5 shadow-sm">
               <i class="fas fa-bolt text-emerald-400"></i> 실시간 갱신 (NEW)
             </span>
-            <h3 class="text-sm font-bold text-white">실시간 유망업종 기술적 지표 포착 관심종목</h3>
+            <h3 class="text-sm font-bold text-white">상위 3대 유망업종 & 8대 지표 포착 관심종목</h3>
             <span class="text-xs text-slate-300 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 ml-2">
               총 {{ screenerStore.newData.length }}개 중 <strong class="text-emerald-400 font-bold">{{ screenerStore.matchedCount }}개 종목 85점+ 매수포착</strong>
             </span>
@@ -175,14 +204,15 @@
                 <th class="px-3 py-3">업종</th>
                 <th class="px-3 py-3">종목코드</th>
                 <th class="px-3 py-3">종목명</th>
-                <th class="px-3 py-3">최신 현재가 (OLD 대비 변동)</th>
+                <th class="px-3 py-3">최신 현재가 (변동)</th>
                 <th class="px-3 py-3">심리선(12일)</th>
                 <th class="px-3 py-3">볼린저 하단</th>
                 <th class="px-3 py-3">이평선 상태</th>
-                <th class="px-3 py-3">MACD 오실레이터</th>
+                <th class="px-3 py-3">MACD</th>
                 <th class="px-3 py-3">RSI(14일)</th>
-                <th class="px-3 py-3">거래량 비율</th>
-                <th class="px-3 py-3 text-center">실시간 퀀트 스코어</th>
+                <th class="px-3 py-3">공매도 분석 (t1927)</th>
+                <th class="px-3 py-3">시장 베이시스 (t2111)</th>
+                <th class="px-3 py-3 text-center">8대 지표 퀀트 스코어</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-800/60">
@@ -213,8 +243,13 @@
                 <td class="px-3 py-3 text-emerald-400 font-semibold text-[11px]"><i class="fas fa-chart-line text-[10px] mr-1"></i> 정배열 지지</td>
                 <td class="px-3 py-3 text-pink-400 font-bold">+{{ item.macdHist }}</td>
                 <td class="px-3 py-3 text-cyan-400 font-bold">{{ item.rsi }}</td>
-                <td class="px-3 py-3 font-bold" :class="item.volumeRatio >= 120 ? 'text-emerald-400' : 'text-slate-400'">
-                  {{ item.volumeRatio }}% {{ item.volumeRatio >= 120 ? '🔥' : '' }}
+                <td class="px-3 py-3 font-bold">
+                  <span class="px-2 py-0.5 rounded text-[10px]" :class="item.shortSellingStatus?.includes('호재') ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-slate-800 text-slate-300'">
+                    {{ item.shortSellingStatus || '정상' }}
+                  </span>
+                </td>
+                <td class="px-3 py-3 text-indigo-400 font-semibold text-[11px]">
+                  콘탱고 (+1.25)
                 </td>
                 
                 <td class="px-3 py-3 text-center">
@@ -222,7 +257,7 @@
                     v-if="item.score >= 85" 
                     class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 inline-flex items-center gap-1 shadow-sm"
                   >
-                    <i class="fas fa-check-circle"></i> 🎯 강력 매수 ({{ item.score }}점)
+                    <i class="fas fa-check-circle"></i> 🎯 8대 지표 우수 ({{ item.score }}점)
                   </span>
                   <span 
                     v-else-if="item.score >= 70" 

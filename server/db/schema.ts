@@ -44,3 +44,12 @@ export const aiReports = sqliteTable('ai_reports', {
   contentMarkdown: text('content_markdown').notNull(),
   createdAt: text('created_at').notNull()
 });
+
+// 4. Watchlist Table (관심 종목)
+export const watchlist = sqliteTable('watchlist', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  shcode: text('shcode').notNull().unique(),
+  name: text('name').notNull(),
+  industry: text('industry'),
+  createdAt: text('created_at').notNull(),
+});
