@@ -19,6 +19,8 @@ export interface StockItem {
   shortSellingStatus?: string;
   shortSellingConfidence?: string;
   shortSellingSummary?: string;
+  shortAvgPrice?: number | null;
+  shortVolume?: number | null;
   shortSellMetrics?: {
     balanceRatioDiff: number;
     priceDiffRate: number;

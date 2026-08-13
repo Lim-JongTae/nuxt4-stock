@@ -107,96 +107,7 @@
 
     <!-- Dual Comparison Layout: OLD (Top) vs NEW (Bottom) -->
     <div class="space-y-6">
-      
-      <!-- 1. OLD Section (Top): 이전 분석 기록 -->
-      <div class="bg-slate-900/40 border border-slate-700/50 rounded-2xl p-4 space-y-3">
-        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-700/40 pb-2.5">
-          <div class="flex items-center gap-2">
-            <span class="px-2.5 py-1 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 font-extrabold text-xs flex items-center gap-1.5 shadow-sm">
-              <i class="fas fa-history text-amber-400"></i> 이전 거래분석 기록 (OLD)
-            </span>
-            <h3 class="text-sm font-bold text-slate-200">이전 기술적 관심종목 리스트</h3>
-          </div>
-          <div class="flex flex-wrap items-center gap-4 text-xs">
-            <span class="text-slate-300 flex items-center gap-1.5 bg-slate-950/80 px-3 py-1 rounded-lg border border-amber-500/40 shadow-sm">
-              <i class="far fa-clock text-amber-400"></i> 이전 기록 작성 시간: <strong class="text-amber-300 font-mono">{{ screenerStore.oldRecordTime }}</strong>
-            </span>
-            <span class="text-slate-400 flex items-center gap-1.5 bg-slate-950/60 px-3 py-1 rounded-lg border border-slate-800">
-              <i class="fas fa-server text-amber-400"></i> 자료수집처: <strong class="text-slate-200">{{ screenerStore.sourceProvider }}</strong>
-            </span>
-          </div>
-        </div>
-
-        <div class="overflow-x-auto border border-slate-800 rounded-xl bg-slate-950/80">
-          <table class="w-full text-xs text-left text-slate-300">
-            <thead class="bg-slate-900/90 text-slate-400 font-semibold border-b border-slate-800 uppercase text-[11px]">
-              <tr>
-                <th class="px-3 py-3">업종</th>
-                <th class="px-3 py-3">종목코드</th>
-                <th class="px-3 py-3">종목명</th>
-                <th class="px-3 py-3">이전 현재가</th>
-                <th class="px-3 py-3">심리선(12일)</th>
-                <th class="px-3 py-3">볼린저 하단</th>
-                <th class="px-3 py-3">이평선 상태</th>
-                <th class="px-3 py-3">거래량(수급)</th>
-                <th class="px-3 py-3">MACD</th>
-                <th class="px-3 py-3">RSI(14일)</th>
-                <th class="px-3 py-3">공매도 분석</th>
-                <th class="px-3 py-3 text-center">이전 퀀트 스코어</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-800/60">
-              <tr 
-                v-for="item in screenerStore.oldData" 
-                :key="item.shcode"
-                class="hover:bg-slate-900/60 transition-all"
-              >
-                <td class="px-3 py-3"><span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-semibold text-[10px]">{{ item.industry }}</span></td>
-                <td class="px-3 py-3 font-mono text-slate-400">{{ item.shcode }}</td>
-                <td class="px-3 py-3 font-bold text-white">
-                  <NuxtLink 
-                    :to="'/stock/' + item.shcode" 
-                    class="text-indigo-300 hover:text-white hover:underline flex items-center gap-1 group transition-colors"
-                    :title="item.name + ' 상세 정밀 분석 보기'"
-                  >
-                    <span>{{ item.name }}</span>
-                    <i class="fas fa-external-link-alt text-[9px] text-indigo-400 opacity-60 group-hover:opacity-100"></i>
-                  </NuxtLink>
-                </td>
-                <td class="px-3 py-3 font-extrabold text-slate-200">{{ Number(item.closePrice).toLocaleString() }}원</td>
-                <td class="px-3 py-3">{{ item.psy }}%</td>
-                <td class="px-3 py-3 font-mono text-slate-400">{{ Number(item.bbLower).toLocaleString() }}원</td>
-                <td class="px-3 py-3 text-emerald-400 font-semibold">정배열 지지</td>
-                <td class="px-3 py-3 font-bold" :class="(item.volumeRatio || 0) >= 120 ? 'text-amber-400 font-extrabold' : 'text-slate-300'">
-                  {{ item.volumeRatio || 120 }}%
-                </td>
-                <td class="px-3 py-3">+{{ item.macdHist }}</td>
-                <td class="px-3 py-3">{{ item.rsi }}</td>
-                <td class="px-3 py-3 font-bold" :title="item.shortSellingSummary || ''">
-                  <span 
-                    class="px-2 py-0.5 rounded text-[10px] font-semibold"
-                    :class="{
-                      'bg-red-500/20 text-red-400 border border-red-500/40': item.shortSellingStatus === '숏커버링(환매수) 유력',
-                      'bg-blue-500/20 text-blue-400 border border-blue-500/40': item.shortSellingStatus === '신규 공매도 유입',
-                      'bg-pink-500/20 text-pink-400 border border-pink-500/40': item.shortSellingStatus === '매수세가 공매도 흡수 중',
-                      'bg-slate-900 text-white border border-slate-400/50': !['숏커버링(환매수) 유력', '신규 공매도 유입', '매수세가 공매도 흡수 중'].includes(item.shortSellingStatus || '')
-                    }"
-                  >
-                    {{ item.shortSellingStatus || '판단 보류' }}
-                  </span>
-                </td>
-                <td class="px-3 py-3 text-center">
-                  <span class="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300 font-bold">
-                    {{ item.score }}점 / 100점
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- 2. NEW Section (Bottom): 실시간 8대 지표 포착 관심종목 -->
+       <!-- 1. NEW Section (Bottom): 실시간 8대 지표 포착 관심종목 -->
       <div class="bg-slate-900/70 border border-indigo-500/40 rounded-2xl p-4 space-y-3 shadow-xl relative overflow-hidden">
         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-500/30 pb-2.5">
           <div class="flex items-center gap-2">
@@ -300,19 +211,14 @@
                     >
                       <i v-if="item.shortSellingStatus === '숏커버링(환매수) 유력'" class="fas fa-arrow-up text-[9px] text-red-400"></i>
                       <i v-else-if="item.shortSellingStatus === '신규 공매도 유입'" class="fas fa-arrow-down text-[9px] text-blue-400"></i>
-                      <span>{{ item.shortSellingStatus || '판단 보류' }}</span>
+                      <span>{{ item.shortSellingStatus || '숏커버링(환매수) 유력' }}</span>
                     </span>
-                    <span 
-                      v-if="item.shortSellingConfidence" 
-                      class="px-1.5 py-0.2 text-[9px] rounded font-mono border"
-                      :class="{
-                        'bg-emerald-950/60 text-emerald-300 border-emerald-500/40': item.shortSellingConfidence === '높음',
-                        'bg-amber-950/60 text-amber-300 border-amber-500/40': item.shortSellingConfidence === '중간',
-                        'bg-slate-900 text-slate-400 border-slate-700': item.shortSellingConfidence === '낮음'
-                      }"
-                    >
-                      신뢰도: {{ item.shortSellingConfidence }}
-                    </span>
+                    <div class="text-[9px] text-rose-300 font-mono flex items-center gap-1" v-if="item.shortAvgPrice && item.shortAvgPrice > 0">
+                      <span>평단가: {{ Number(item.shortAvgPrice).toLocaleString() }}원</span>
+                    </div>
+                    <div class="text-[9px] text-amber-300/90 font-mono" v-if="item.shortVolume && item.shortVolume > 0">
+                      <span>매도량: {{ Number(item.shortVolume).toLocaleString() }}주</span>
+                    </div>
                   </div>
                 </td>
                 <td class="px-3 py-3 text-indigo-400 font-semibold text-[11px]">
@@ -342,6 +248,95 @@
         </div>
       </div>
 
+      <!-- 2. OLD Section (Top): 이전 분석 기록 -->
+      <div class="bg-slate-900/40 border border-slate-700/50 rounded-2xl p-4 space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-700/40 pb-2.5">
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-1 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 font-extrabold text-xs flex items-center gap-1.5 shadow-sm">
+              <i class="fas fa-history text-amber-400"></i> 이전 거래분석 기록 (OLD)
+            </span>
+            <h3 class="text-sm font-bold text-slate-200">이전 기술적 관심종목 리스트</h3>
+          </div>
+          <div class="flex flex-wrap items-center gap-4 text-xs">
+            <span class="text-slate-300 flex items-center gap-1.5 bg-slate-950/80 px-3 py-1 rounded-lg border border-amber-500/40 shadow-sm">
+              <i class="far fa-clock text-amber-400"></i> 이전 기록 작성 시간: <strong class="text-amber-300 font-mono">{{ screenerStore.oldRecordTime }}</strong>
+            </span>
+            <span class="text-slate-400 flex items-center gap-1.5 bg-slate-950/60 px-3 py-1 rounded-lg border border-slate-800">
+              <i class="fas fa-server text-amber-400"></i> 자료수집처: <strong class="text-slate-200">{{ screenerStore.sourceProvider }}</strong>
+            </span>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto border border-slate-800 rounded-xl bg-slate-950/80">
+          <table class="w-full text-xs text-left text-slate-300">
+            <thead class="bg-slate-900/90 text-slate-400 font-semibold border-b border-slate-800 uppercase text-[11px]">
+              <tr>
+                <th class="px-3 py-3">업종</th>
+                <th class="px-3 py-3">종목코드</th>
+                <th class="px-3 py-3">종목명</th>
+                <th class="px-3 py-3">이전 현재가</th>
+                <th class="px-3 py-3">심리선(12일)</th>
+                <th class="px-3 py-3">볼린저 하단</th>
+                <th class="px-3 py-3">이평선 상태</th>
+                <th class="px-3 py-3">거래량(수급)</th>
+                <th class="px-3 py-3">MACD</th>
+                <th class="px-3 py-3">RSI(14일)</th>
+                <th class="px-3 py-3">공매도 분석</th>
+                <th class="px-3 py-3 text-center">이전 퀀트 스코어</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/60">
+              <tr 
+                v-for="item in screenerStore.oldData" 
+                :key="item.shcode"
+                class="hover:bg-slate-900/60 transition-all"
+              >
+                <td class="px-3 py-3"><span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-semibold text-[10px]">{{ item.industry }}</span></td>
+                <td class="px-3 py-3 font-mono text-slate-400">{{ item.shcode }}</td>
+                <td class="px-3 py-3 font-bold text-white">
+                  <NuxtLink 
+                    :to="'/stock/' + item.shcode" 
+                    class="text-indigo-300 hover:text-white hover:underline flex items-center gap-1 group transition-colors"
+                    :title="item.name + ' 상세 정밀 분석 보기'"
+                  >
+                    <span>{{ item.name }}</span>
+                    <i class="fas fa-external-link-alt text-[9px] text-indigo-400 opacity-60 group-hover:opacity-100"></i>
+                  </NuxtLink>
+                </td>
+                <td class="px-3 py-3 font-extrabold text-slate-200">{{ Number(item.closePrice).toLocaleString() }}원</td>
+                <td class="px-3 py-3">{{ item.psy }}%</td>
+                <td class="px-3 py-3 font-mono text-slate-400">{{ Number(item.bbLower).toLocaleString() }}원</td>
+                <td class="px-3 py-3 text-emerald-400 font-semibold">정배열 지지</td>
+                <td class="px-3 py-3 font-bold" :class="(item.volumeRatio || 0) >= 120 ? 'text-amber-400 font-extrabold' : 'text-slate-300'">
+                  {{ item.volumeRatio || 120 }}%
+                </td>
+                <td class="px-3 py-3">+{{ item.macdHist }}</td>
+                <td class="px-3 py-3">{{ item.rsi }}</td>
+                <td class="px-3 py-3 font-bold" :title="item.shortSellingSummary || ''">
+                  <span 
+                    class="px-2 py-0.5 rounded text-[10px] font-semibold"
+                    :class="{
+                      'bg-red-500/20 text-red-400 border border-red-500/40': item.shortSellingStatus === '숏커버링(환매수) 유력',
+                      'bg-blue-500/20 text-blue-400 border border-blue-500/40': item.shortSellingStatus === '신규 공매도 유입',
+                      'bg-pink-500/20 text-pink-400 border border-pink-500/40': item.shortSellingStatus === '매수세가 공매도 흡수 중',
+                      'bg-slate-900 text-white border border-slate-400/50': !['숏커버링(환매수) 유력', '신규 공매도 유입', '매수세가 공매도 흡수 중'].includes(item.shortSellingStatus || '')
+                    }"
+                  >
+                    {{ item.shortSellingStatus || '판단 보류' }}
+                  </span>
+                </td>
+                <td class="px-3 py-3 text-center">
+                  <span class="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300 font-bold">
+                    {{ item.score }}점 / 100점
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+     
     </div>
   </div>
 </template>

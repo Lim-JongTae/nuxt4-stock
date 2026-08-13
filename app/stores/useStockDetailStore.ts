@@ -35,7 +35,7 @@ export interface StockDetailStateItem {
 }
 
 const STOCK_DETAIL_STORAGE_KEY = 'nuxt4_stock_detail_cache_v2';
-const EXPIRATION_MS = 30 * 24 * 60 * 60 * 1000; // 30일 보존 정책
+const EXPIRATION_MS = 15 * 24 * 60 * 60 * 1000; // 15일 보존 정책
 
 export const useStockDetailStore = defineStore('stockDetail', {
   state: () => ({
@@ -45,7 +45,7 @@ export const useStockDetailStore = defineStore('stockDetail', {
   }),
 
   actions: {
-    // 1. LocalStorage에서 종목 상세 캐시 불러오기 (30일 초과 데이터 자동 정리)
+    // 1. LocalStorage에서 종목 상세 캐시 불러오기 (15일 초과 데이터 자동 정리)
     initFromStorage() {
       if (typeof window === 'undefined') return;
       try {
@@ -58,7 +58,7 @@ export const useStockDetailStore = defineStore('stockDetail', {
           Object.keys(parsed).forEach((key) => {
             const item = parsed[key];
             if (item && item.cachedTimestamp && now - item.cachedTimestamp > EXPIRATION_MS) {
-              delete parsed[key]; // 30일 경과 항목 자동 폐기
+              delete parsed[key]; // 15일 경과 항목 자동 폐기
               hasExpired = true;
             }
           });

@@ -226,12 +226,12 @@ export async function fetchLST1305Prices(
 export const fetchLST8410SujungPrices = fetchLST1305Prices;
 export const fetchLSHtsPeriodicalPrices = fetchLST1305Prices;
 
-// 3. Fetch Short Selling Details via LS API (t1927) - 공매도 전용 지표만 수집
+// 3. Fetch Short Selling Details via LS API (t1927) - 공매도 전용 지표 수집
 export async function fetchLSShortSellDetailMap(
   token: string,
   shcode: string
-): Promise<Map<string, { balanceRatio: number; shortAvgPrice: number }>> {
-  const detailMap = new Map<string, { balanceRatio: number; shortAvgPrice: number }>();
+): Promise<Map<string, { balanceRatio: number; shortAvgPrice: number; shortVolume: number; changeRate: number }>> {
+  const detailMap = new Map<string, { balanceRatio: number; shortAvgPrice: number; shortVolume: number; changeRate: number }>();
   const rawCode = sanitizeDomesticShcode(shcode);
   if (!rawCode) return detailMap;
 
@@ -277,9 +277,11 @@ export async function fetchLSShortSellDetailMap(
             
             const balanceRatio = parseLSNumberOrUndefined(r.gm_per) ?? parseLSNumberOrUndefined(r.ms_m_rate) ?? parseLSNumberOrUndefined(r.ms_rate) ?? 0;
             const shortAvgPrice = parseLSNumberOrUndefined(r.gm_avg) ?? parseLSNumberOrUndefined(r.price) ?? 0;
+            const shortVolume = parseLSNumber(r.gm_vo) || parseLSNumber(r.gm_vo_sum) || 0;
+            const changeRate = parseFloat(String(r.diff || 0));
 
             if (formattedDate) {
-              detailMap.set(formattedDate, { balanceRatio, shortAvgPrice });
+              detailMap.set(formattedDate, { balanceRatio, shortAvgPrice, shortVolume, changeRate });
             }
           });
           if (detailMap.size > 0) break;
@@ -320,6 +322,7 @@ export async function fetchLSShortSellTrend(
         // 시세 종가 및 거래량은 오직 t1305 원본에서 추출
         let price = hts?.close || 0;
         let volume = hts?.volume || 0;
+        const changeRate = hts?.diff !== undefined ? hts.diff : (shortDetail?.changeRate || 0);
 
         // 오늘 날짜 데이터는 t1102 라이브 실시간가로 덮어써서 메인 종가와 통일
         if (date === formattedToday && livePrice && livePrice > 0) {
@@ -327,6 +330,7 @@ export async function fetchLSShortSellTrend(
         }
 
         const shortAvgPrice = shortDetail?.shortAvgPrice ? shortDetail.shortAvgPrice : undefined;
+        const shortVolume = shortDetail?.shortVolume ? shortDetail.shortVolume : undefined;
         const balanceRatio = shortDetail?.balanceRatio ?? 0;
 
         return {
@@ -334,6 +338,8 @@ export async function fetchLSShortSellTrend(
           price,
           volume,
           shortAvgPrice,
+          shortVolume,
+          changeRate,
           balanceRatio
         };
       }).filter(r => r.price > 0);

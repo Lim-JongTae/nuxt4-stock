@@ -1,6 +1,7 @@
 import { defineEventHandler, readBody, createError } from 'h3';
 import fs from 'fs';
 import path from 'path';
+import { QUANT_SYSTEM_PROMPT } from '~/../server/prompts/quantSystemPrompt';
 
 function loadEnv() {
   const envPath = path.resolve(process.cwd(), '.env');
@@ -56,9 +57,8 @@ export default defineEventHandler(async (event) => {
       },
       body: JSON.stringify({
         model,
-        max_tokens: body.max_tokens || 550,
-        system:
-          '당신은 주식 퀀트 전문 AI 분석가입니다. 장황한 인사말이나 보고서 생성 시각 문구를 절대 작성하지 마시고, 핵심 퀀트 분석 마크다운 보고서만 작성하세요. 목표가와 손절가는 동적으로 제시하세요.',
+        max_tokens: body.max_tokens || 700,
+        system: QUANT_SYSTEM_PROMPT,
         messages: body.messages || [{ role: 'user', content: prompt }]
       }),
       signal: AbortSignal.timeout(90000) as any
@@ -93,12 +93,11 @@ export default defineEventHandler(async (event) => {
       },
       body: JSON.stringify({
         model,
-        max_tokens: body.max_tokens || 550,
+        max_tokens: body.max_tokens || 700,
         messages: [
           {
             role: 'system',
-            content:
-              '당신은 주식 퀀트 전문 AI 분석가입니다. 장황한 인사말이나 보고서 생성 시각 문구를 절대 작성하지 마시고, 핵심 퀀트 분석 마크다운 보고서만 작성하세요. 목표가와 손절가는 동적으로 제시하세요.'
+            content: QUANT_SYSTEM_PROMPT
           },
           { role: 'user', content: prompt }
         ]

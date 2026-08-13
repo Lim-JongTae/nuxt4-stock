@@ -85,7 +85,7 @@
       </div>
 
       <!-- Real-time 8 Indicators AI Quant Investment Decision Box -->
-      <div v-if="aiAnalysis" class="bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/60 border border-purple-500/40 rounded-2xl p-6 shadow-2xl space-y-5">
+      <div v-if="aiAnalysis" class="bg-linear-to-br from-slate-900 via-slate-900 to-indigo-950/60 border border-purple-500/40 rounded-2xl p-6 shadow-2xl space-y-5">
         <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-xl bg-purple-600/30 border border-purple-500/50 flex items-center justify-center text-purple-300 font-bold text-lg shadow-lg">
@@ -247,22 +247,30 @@
           <table class="w-full text-left text-xs">
             <thead class="bg-slate-950 text-slate-400 font-bold border-b border-slate-800">
               <tr>
-                <th class="px-4 py-3">일자 (Date)</th>
-                <th class="px-4 py-3">주가 종가 (Close)</th>
-                <th class="px-4 py-3 text-rose-400">공매도 평균체결가 (Short Avg)</th>
-                <th class="px-4 py-3">공매도 잔고비율 (%)</th>
-                <th class="px-4 py-3">거래량 (Volume)</th>
+                <th class="px-3 py-3">일자 (Date)</th>
+                <th class="px-3 py-3">주가 종가 (Close)</th>
+                <th class="px-3 py-3 text-center">등락율 (%)</th>
+                <th class="px-3 py-3 text-rose-400">공매도 평균단가 (Short Avg)</th>
+                <th class="px-3 py-3 text-amber-300">누적 공매도 수량 (Short Vol)</th>
+                <th class="px-3 py-3 text-purple-300">공매도 잔고비율 (%)</th>
+                <th class="px-3 py-3 text-right">총 거래량 (Volume)</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-800/60 text-slate-200">
               <tr v-for="(rec, idx) in stockData.shortSellHistory" :key="idx" class="hover:bg-slate-850/50">
-                <td class="px-4 py-3 font-mono font-bold">{{ rec.date }}</td>
-                <td class="px-4 py-3 font-mono font-bold text-emerald-400">{{ Number(rec.price).toLocaleString() }}원</td>
-                <td class="px-4 py-3 font-mono font-bold text-rose-300">
+                <td class="px-3 py-3 font-mono font-bold">{{ rec.date }}</td>
+                <td class="px-3 py-3 font-mono font-bold text-slate-100">{{ Number(rec.price).toLocaleString() }}원</td>
+                <td class="px-3 py-3 font-mono font-bold text-center" :class="(rec.changeRate || 0) >= 0 ? 'text-red-400' : 'text-blue-400'">
+                  {{ typeof rec.changeRate === 'number' ? (rec.changeRate > 0 ? '+' + rec.changeRate : rec.changeRate) + '%' : '-' }}
+                </td>
+                <td class="px-3 py-3 font-mono font-bold text-rose-300">
                   {{ rec.shortAvgPrice && rec.shortAvgPrice > 0 ? Number(rec.shortAvgPrice).toLocaleString() + '원' : '-' }}
                 </td>
-                <td class="px-4 py-3 font-mono font-bold text-purple-300">{{ rec.balanceRatio }}%</td>
-                <td class="px-4 py-3 font-mono text-slate-300">{{ Number(rec.volume).toLocaleString() }}주</td>
+                <td class="px-3 py-3 font-mono font-bold text-amber-300">
+                  {{ rec.shortVolume && rec.shortVolume > 0 ? Number(rec.shortVolume).toLocaleString() + '주' : '-' }}
+                </td>
+                <td class="px-3 py-3 font-mono font-bold text-purple-300">{{ rec.balanceRatio }}%</td>
+                <td class="px-3 py-3 font-mono text-slate-300 text-right">{{ Number(rec.volume).toLocaleString() }}주</td>
               </tr>
             </tbody>
           </table>

@@ -134,8 +134,9 @@ export default defineEventHandler(async (event) => {
     const cond_rsi = typeof rsi === 'number' && rsi <= 35.0;
     const cond_divergence = bullish_divergence === true;
 
-    // 공매도 신호 분류
-    const shortSignal = classifyShortSellSignal(shortSellHistory);
+    // 공매도 신호 분류 (ETF / 해외종목 구분)
+    const isEtfOrForeign = s.shcode.startsWith('US') || s.name.includes('액티브') || s.name.includes('KODEX') || s.name.includes('SOL') || s.name.includes('KoAct') || s.name.includes('ETF');
+    const shortSignal = classifyShortSellSignal(shortSellHistory, isEtfOrForeign);
     const cond_short_signal = shortSignal.label === "숏커버링(환매수) 유력" || shortSignal.label === "매수세가 공매도 흡수 중";
 
     // 100점 만점 퀀트 배점
@@ -171,6 +172,8 @@ export default defineEventHandler(async (event) => {
       shortSellingConfidence: shortSignal.confidence,
       shortSellingSummary: shortSignal.summary,
       shortSellMetrics: shortSignal.metrics,
+      shortAvgPrice: shortSellHistory && shortSellHistory.length > 0 ? shortSellHistory[0]?.shortAvgPrice : undefined,
+      shortVolume: shortSellHistory && shortSellHistory.length > 0 ? shortSellHistory[0]?.shortVolume : undefined,
       score,
       isFullyMatched: is_fully_matched,
       createdAt: localTime
