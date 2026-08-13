@@ -1,7 +1,7 @@
 import { defineEventHandler, readBody, createError } from 'h3';
 import fs from 'fs';
 import path from 'path';
-import { QUANT_SYSTEM_PROMPT } from '~/../server/prompts/quantSystemPrompt';
+import { QUANT_SYSTEM_PROMPT } from '../../prompts/quantSystemPrompt';
 
 function loadEnv() {
   const envPath = path.resolve(process.cwd(), '.env');
