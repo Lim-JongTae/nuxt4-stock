@@ -7,15 +7,15 @@ export interface StockItem {
   name: string;
   industry: string;
   closePrice: number;
-  psy: number;
-  bbLower: number;
-  ma5: number;
-  ma20: number;
-  ma60: number;
-  volumeRatio: number;
-  macdHist: number;
-  rsi: number;
-  bullishDivergence: boolean;
+  psy?: number | null;
+  bbLower?: number | null;
+  ma5?: number | null;
+  ma20?: number | null;
+  ma60?: number | null;
+  volumeRatio?: number | null;
+  macdHist?: number | null;
+  rsi?: number | null;
+  bullishDivergence?: boolean | null;
   shortSellingStatus?: string;
   shortSellingConfidence?: string;
   shortSellingSummary?: string;
@@ -28,6 +28,8 @@ export interface StockItem {
   isFullyMatched: boolean;
   createdAt: string;
 }
+
+const STORAGE_KEY = 'nuxt4_stock_screener_cache';
 
 export const useScreenerStore = defineStore('screener', {
   state: () => ({
@@ -42,12 +44,11 @@ export const useScreenerStore = defineStore('screener', {
   getters: {
     has85PlusMatched: (state) => {
       if (!state.newData || state.newData.length === 0) return false;
-      return state.newData.some(item => item.score >= 85 || item.isFullyMatched);
+      return state.newData.some(item => item.isFullyMatched);
     },
-    matchedCount: (state) => state.newData.filter(item => item.isFullyMatched || item.score >= 85).length,
+    matchedCount: (state) => state.newData.filter(item => item.isFullyMatched).length,
     topBuyRecommendations: (state) => {
       if (!state.newData || state.newData.length === 0) return [];
-      // 85점 이상 유무 상관없이 최고 점수 순 상위 3개 나열
       return [...state.newData].sort((a, b) => b.score - a.score).slice(0, 3);
     },
     oldRecordTime: (state) => {
@@ -59,6 +60,43 @@ export const useScreenerStore = defineStore('screener', {
   },
 
   actions: {
+    // 최초 진입 시 스토리지/캐시 데이터 불러오기
+    initFromStorage() {
+      if (typeof window === 'undefined') return;
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.newData && Array.isArray(parsed.newData)) {
+            this.newData = parsed.newData;
+          }
+          if (parsed.oldData && Array.isArray(parsed.oldData)) {
+            this.oldData = parsed.oldData;
+          }
+          this.lastUpdated = parsed.lastUpdated || '';
+          this.sourceProvider = parsed.sourceProvider || this.sourceProvider;
+        }
+      } catch (e) {
+        console.error('Failed to load screener cache from storage:', e);
+      }
+    },
+
+    // 데이터를 스토리지에 보관
+    saveToStorage() {
+      if (typeof window === 'undefined') return;
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          newData: this.newData,
+          oldData: this.oldData,
+          lastUpdated: this.lastUpdated,
+          sourceProvider: this.sourceProvider
+        }));
+      } catch (e) {
+        console.error('Failed to save screener cache to storage:', e);
+      }
+    },
+
+    // 새로고침 및 시세조회 버튼 클릭시에만 실행하여 API 재호출
     async refreshScreener() {
       if (this.isRefreshing) return;
       this.isRefreshing = true;
@@ -85,6 +123,9 @@ export const useScreenerStore = defineStore('screener', {
           if (response.error) {
             this.errorMessage = response.error;
           }
+
+          // 성공적인 데이터 반환 시 스토리지에 캐시 저장
+          this.saveToStorage();
         }
       } catch (err: any) {
         console.error('Screener refresh error:', err);

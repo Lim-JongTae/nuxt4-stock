@@ -11,7 +11,7 @@
             <span class="text-xs text-slate-400">상위 3대 유망업종 & 8대 종합 지표 (공매도 + 선물/옵션 시장 방향성)</span>
           </div>
           <h2 class="text-xl font-extrabold text-white">
-            상위 3대 유망업종 관심종목 8대 지표 정밀 검증 (`watchlist.csv` / `watchlist.json`)
+            상위 3대 유망업종 보유/관심종목 8대 지표 정밀 검증 (`종목.md` 실시간 연동)
           </h2>
           <p class="text-xs text-emerald-400 mt-1 bg-slate-950/70 border border-emerald-500/30 p-2 rounded-lg">
             심리선 + 볼린저하단 + 이평선정배열 + 거래량 + MACD + RSI + 공매도/숏커버링 + KOSPI200 선물 베이시스 8가지 지표를 종합 판단합니다.
@@ -21,7 +21,7 @@
         <button 
           @click="screenerStore.refreshScreener()" 
           :disabled="screenerStore.isRefreshing"
-          class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-500/20 flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+          class="px-5 py-2.5 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-500/20 flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
         >
           <i class="fas" :class="screenerStore.isRefreshing ? 'fa-spinner fa-spin' : 'fa-sync-alt'"></i>
           <span>{{ screenerStore.isRefreshing ? 'LS증권 API 시세 분석 중...' : '실시간 8대 지표 데이터 갱신' }}</span>
@@ -153,7 +153,16 @@
               >
                 <td class="px-3 py-3"><span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-semibold text-[10px]">{{ item.industry }}</span></td>
                 <td class="px-3 py-3 font-mono text-slate-400">{{ item.shcode }}</td>
-                <td class="px-3 py-3 font-bold text-white">{{ item.name }}</td>
+                <td class="px-3 py-3 font-bold text-white">
+                  <NuxtLink 
+                    :to="'/stock/' + item.shcode" 
+                    class="text-indigo-300 hover:text-white hover:underline flex items-center gap-1 group transition-colors"
+                    :title="item.name + ' 상세 정밀 분석 보기'"
+                  >
+                    <span>{{ item.name }}</span>
+                    <i class="fas fa-external-link-alt text-[9px] text-indigo-400 opacity-60 group-hover:opacity-100"></i>
+                  </NuxtLink>
+                </td>
                 <td class="px-3 py-3 font-extrabold text-slate-200">{{ Number(item.closePrice).toLocaleString() }}원</td>
                 <td class="px-3 py-3">{{ item.psy }}%</td>
                 <td class="px-3 py-3 font-mono text-slate-400">{{ Number(item.bbLower).toLocaleString() }}원</td>
@@ -237,7 +246,16 @@
               >
                 <td class="px-3 py-3"><span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-semibold text-[10px]">{{ item.industry }}</span></td>
                 <td class="px-3 py-3 font-mono text-slate-400">{{ item.shcode }}</td>
-                <td class="px-3 py-3 font-bold text-white">{{ item.name }}</td>
+                <td class="px-3 py-3 font-bold text-white">
+                  <NuxtLink 
+                    :to="'/stock/' + item.shcode" 
+                    class="text-indigo-300 hover:text-white hover:underline flex items-center gap-1 group transition-colors"
+                    :title="item.name + ' 실시간 AI 상세 정밀 분석 보기'"
+                  >
+                    <span>{{ item.name }}</span>
+                    <i class="fas fa-external-link-alt text-[9px] text-indigo-400 opacity-60 group-hover:opacity-100"></i>
+                  </NuxtLink>
+                </td>
                 
                 <!-- Price Display with Delta -->
                 <td class="px-3 py-3 font-extrabold text-slate-100">
@@ -249,17 +267,26 @@
                   </template>
                 </td>
 
-                <td class="px-3 py-3" :class="item.psy <= 25 ? 'text-emerald-400 font-extrabold' : 'text-slate-300'">
-                  {{ item.psy }}% {{ item.psy <= 25 ? '(과매도)' : '' }}
+                <td class="px-3 py-3" :class="typeof item.psy === 'number' && item.psy <= 25 ? 'text-emerald-400 font-extrabold' : 'text-slate-300'">
+                  {{ typeof item.psy === 'number' ? item.psy + '%' + (item.psy <= 25 ? ' (과매도)' : '') : 'N/A' }}
                 </td>
-                <td class="px-3 py-3 font-mono text-slate-300 text-[11px]">{{ Number(item.bbLower).toLocaleString() }}원</td>
-                <td class="px-3 py-3 text-emerald-400 font-semibold text-[11px]"><i class="fas fa-chart-line text-[10px] mr-1"></i> 정배열 지지</td>
-                <td class="px-3 py-3 font-bold" :class="(item.volumeRatio || 0) >= 120 ? 'text-amber-400 font-extrabold' : 'text-slate-300'">
-                  <div>{{ item.volumeRatio || 120 }}%</div>
-                  <div class="text-[9px] text-amber-400/80 font-normal">전일대비 급증</div>
+                <td class="px-3 py-3 font-mono text-slate-300 text-[11px]">
+                  {{ typeof item.bbLower === 'number' && item.bbLower > 0 ? Number(item.bbLower).toLocaleString() + '원' : 'N/A' }}
                 </td>
-                <td class="px-3 py-3 text-pink-400 font-bold">+{{ item.macdHist }}</td>
-                <td class="px-3 py-3 text-cyan-400 font-bold">{{ item.rsi }}</td>
+                <td class="px-3 py-3 text-emerald-400 font-semibold text-[11px]">
+                  <span v-if="item.ma5 && item.ma20 && item.ma60 && item.ma5 >= item.ma20 && item.ma20 >= item.ma60"><i class="fas fa-chart-line text-[10px] mr-1"></i> 정배열 지지</span>
+                  <span v-else class="text-slate-400 font-normal">미달성/N/A</span>
+                </td>
+                <td class="px-3 py-3 font-bold" :class="typeof item.volumeRatio === 'number' && item.volumeRatio >= 120 ? 'text-amber-400 font-extrabold' : 'text-slate-300'">
+                  <div>{{ typeof item.volumeRatio === 'number' ? item.volumeRatio + '%' : 'N/A' }}</div>
+                  <div v-if="typeof item.volumeRatio === 'number' && item.volumeRatio >= 120" class="text-[9px] text-amber-400/80 font-normal">전일대비 급증</div>
+                </td>
+                <td class="px-3 py-3 text-pink-400 font-bold">
+                  {{ typeof item.macdHist === 'number' ? (item.macdHist > 0 ? '+' + item.macdHist : item.macdHist) : 'N/A' }}
+                </td>
+                <td class="px-3 py-3 text-cyan-400 font-bold">
+                  {{ typeof item.rsi === 'number' ? item.rsi : 'N/A' }}
+                </td>
                 <td class="px-3 py-3 font-bold" :title="item.shortSellingSummary || ''">
                   <div class="flex flex-col gap-1 items-start">
                     <span 
@@ -325,6 +352,7 @@ import { useScreenerStore, type StockItem } from '~/stores/useScreenerStore';
 const screenerStore = useScreenerStore();
 
 onMounted(async () => {
+  screenerStore.initFromStorage();
   if (screenerStore.newData.length === 0) {
     await screenerStore.refreshScreener();
   }
