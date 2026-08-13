@@ -9,8 +9,8 @@
 - **API 서비스 URL**: `https://openapi.ls-sec.co.kr`
 - **인증 방식**: OAuth 2.0 (Client Credentials Grant)
 - **환경 변수 (`.env`)**:
-  - `LS_APP_KEY`: App Key (`PSxqiyZfJsMtqWtGp4EiVY5xqsCJANkJb8y7`)
-  - `LS_SECREAT`: App Secret Key (`0NBTDo5J2k7HvS4HYttPoBtcVJIvI6BQ`)
+  - `LS_APP_KEY`: LS증권 App Key (예: `YOUR_LS_APP_KEY_HERE`)
+  - `LS_SECREAT`: LS증권 App Secret Key (예: `YOUR_LS_SECRET_KEY_HERE`)
 
 ### 🔑 접근 토큰 (Access Token) 발급 API
 - **HTTP Method & URL**: `POST https://openapi.ls-sec.co.kr/oauth2/token`
