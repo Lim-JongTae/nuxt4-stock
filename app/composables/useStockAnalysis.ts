@@ -111,21 +111,32 @@ ${targetRule}
         method: 'POST',
         body: {
           prompt,
-          system: '당신은 한국 주식 및 LS증권 8대 기술적 지표 전문 AI 트레이딩 리서처입니다. 보유 종목이면 [매도] / [유지], 미보유 시 [매수] / [관찰]을 명확히 판단하고 JSON만 답변하세요.',
-          temperature: 0.2
+          system: '당신은 주식 퀀트 리서처입니다. 절대로 마크다운 코드블록이나 서론 설명 없이 오직 한 개의 순수 유효한 JSON 객체만 출력하십시오.',
+          temperature: 0.1,
+          maxTokens: 700
         }
       });
 
       if (!response || !response.content) {
-        throw new Error('Claude API 응답 데이터 수진에 실패했습니다.');
+        throw new Error('Claude API 응답 데이터 수신에 실패했습니다.');
       }
 
-      const jsonMatch = response.content.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error('Claude API 응답에서 유효한 JSON 구문을 생성하지 못했습니다.');
+      let rawContent = response.content.trim();
+      rawContent = rawContent.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+      const jsonMatch = rawContent.match(/\{[\s\S]*\}/);
+      
+      let parsedJson: any = null;
+      if (jsonMatch) {
+        try {
+          parsedJson = JSON.parse(jsonMatch[0]);
+        } catch (parseErr) {
+          console.error('Failed to parse matched JSON substring:', parseErr, jsonMatch[0]);
+        }
       }
 
-      const parsedJson = JSON.parse(jsonMatch[0]);
+      if (!parsedJson) {
+        throw new Error('Claude API 응답에서 유효한 JSON 구문을 파싱하지 못했습니다.');
+      }
 
       let validDecision: "매도" | "유지" | "매수" | "관찰" = isHolding ? "유지" : "관찰";
       if (isHolding) {
@@ -166,8 +177,8 @@ ${targetRule}
 
     } catch (err: any) {
       console.error('Claude API Error:', err);
-      // 더미 대체 생성 금지: 오류 발생 시 에러 메세지를 명확히 전파
-      analysisError.value = `[Claude API 요청 실패]: ${err.statusMessage || err.message || 'API 통신 오류'}`;
+      // 사용자 원칙: 폴백/대체 생성 금지 -> 데이터 조회 실패 시 명확한 오류 표시
+      analysisError.value = `[AI 분석 API 통신 실패]: ${err?.data?.statusMessage || err?.statusMessage || err?.message || 'Claude AI 게이트웨이 응답 수신 실패'}`;
       return null;
     } finally {
       isAnalyzing.value = false;

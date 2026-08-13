@@ -61,10 +61,8 @@ export default defineEventHandler(async (event) => {
     for (let i = 0; i < candidateStocks.length; i += BATCH_SIZE) {
       const batch = candidateStocks.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(batch.map(async (stock) => {
-        const [livePrice, shortSellTrend] = await Promise.all([
-          fetchLSPrice(token, stock.shcode),
-          fetchLSShortSellTrend(token, stock.shcode)
-        ]);
+        const livePrice = await fetchLSPrice(token, stock.shcode);
+        const shortSellTrend = await fetchLSShortSellTrend(token, stock.shcode, livePrice);
 
         stockLiveMap.set(stock.shcode, {
           price: livePrice || undefined,
@@ -179,7 +177,7 @@ export default defineEventHandler(async (event) => {
     };
   });
 
-  // DB에 갱신 결과 영속 저장
+  // DB에 갱신 결과 저장 중단 (Client-side Store & LocalStorage 영구화로 전환)
   let oldData: typeof newBatch = [];
   try {
     const recentRows = await db.select()
@@ -191,12 +189,8 @@ export default defineEventHandler(async (event) => {
       const lastBatchId = recentRows[0].batchId;
       oldData = recentRows.filter(r => r.batchId === lastBatchId);
     }
-
-    if (newBatch.length > 0) {
-      await db.insert(screenerHistory).values(newBatch);
-    }
   } catch (dbErr) {
-    console.error('Screener DB save error:', dbErr);
+    console.error('Screener DB query error:', dbErr);
   }
 
   if (oldData.length === 0) {

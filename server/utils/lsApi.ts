@@ -32,11 +32,18 @@ function parseLSNumber(val: any): number {
   return isNaN(num) ? 0 : Math.abs(num);
 }
 
+// Helper to return undefined for empty/null values while preserving valid 0
+function parseLSNumberOrUndefined(val: any): number | undefined {
+  if (val === undefined || val === null || String(val).trim() === '') return undefined;
+  const str = String(val).replace(/[,+\s]/g, '').trim();
+  const num = parseFloat(str);
+  return isNaN(num) ? undefined : Math.abs(num);
+}
+
 // Domestic Korean Stock Code Validation (Must be exactly 6 characters, e.g. 005930, 0186L0)
 function sanitizeDomesticShcode(shcode: string): string | null {
   if (!shcode) return null;
   const cleaned = String(shcode).trim().replace(/^A/i, '');
-  // Skip US stocks (e.g. US19801212001) or non-6 digit codes for domestic TRs
   if (cleaned.startsWith('US') || cleaned.length !== 6) {
     return null;
   }
@@ -54,8 +61,8 @@ export async function getLSToken(appKey: string, appSecret: string): Promise<{ t
   }
 
   const urls = [
-    'https://openapi.ls-sec.co.kr/oauth2/token',
-    'https://openapi.ls-sec.co.kr:8080/oauth2/token'
+    'https://openapi.ls-sec.co.kr:8080/oauth2/token',
+    'https://openapi.ls-sec.co.kr/oauth2/token'
   ];
 
   let lastErr = '';
@@ -97,8 +104,8 @@ export async function fetchLSPrice(token: string, shcode: string): Promise<numbe
   if (!rawCode) return null;
 
   const urls = [
-    'https://openapi.ls-sec.co.kr/stock/market-data',
-    'https://openapi.ls-sec.co.kr:8080/stock/market-data'
+    'https://openapi.ls-sec.co.kr:8080/stock/market-data',
+    'https://openapi.ls-sec.co.kr/stock/market-data'
   ];
 
   for (const url of urls) {
@@ -126,42 +133,40 @@ export async function fetchLSPrice(token: string, shcode: string): Promise<numbe
   return null;
 }
 
-// 2. Fetch HTS Daily Stock Chart Prices (t8413 주식 일봉 시세 TR)
-export async function fetchLSHtsPeriodicalPrices(token: string, shcode: string): Promise<Map<string, { close: number; volume: number }> | null> {
+// 2. Fetch Stock Daily Prices via LS API (t1305 기간별주가 TR - /stock/market-data, exchgubun: 'U' 통합시세 KRX+NXT)
+export async function fetchLST1305Prices(
+  token: string,
+  shcode: string,
+  externalLivePrice?: number | null
+): Promise<Map<string, { close: number; open: number; high: number; low: number; volume: number; change?: number; diff?: number }> | null> {
   const rawCode = sanitizeDomesticShcode(shcode);
   if (!rawCode) return null;
 
-  const now = new Date();
-  const edate = formatDateYYYYMMDD(now);
-  const past = new Date(now.getTime() - 25 * 24 * 60 * 60 * 1000);
-  const sdate = formatDateYYYYMMDD(past);
+  const htsMap = new Map<string, { close: number; open: number; high: number; low: number; volume: number; change?: number; diff?: number }>();
 
-  const htsMap = new Map<string, { close: number; volume: number }>();
-
-  const urlsT8413 = [
-    'https://openapi.ls-sec.co.kr/stock/chart',
-    'https://openapi.ls-sec.co.kr:8080/stock/chart'
+  const urls = [
+    'https://openapi.ls-sec.co.kr:8080/stock/market-data',
+    'https://openapi.ls-sec.co.kr/stock/market-data'
   ];
 
-  for (const url of urlsT8413) {
+  for (const url of urls) {
     try {
       const res = await fetch(url, {
         method: 'POST',
         headers: {
           'content-type': 'application/json; charset=utf-8',
           'authorization': 'Bearer ' + token,
-          'tr_cd': 't8413',
+          'tr_cd': 't1305',
           'tr_cont': 'N'
         },
         body: JSON.stringify({
-          t8413InBlock: {
+          t1305InBlock: {
             shcode: rawCode,
-            gubun: '2',
-            qrycnt: 30,
-            sdate: sdate,
-            edate: edate,
-            cts_date: '',
-            comp_yn: 'N'
+            dwmcode: 1, // 1@일
+            date: '',
+            idx: 0,
+            cnt: 15,   // 과거 15개 일봉 수집
+            exchgubun: 'U' // U: 통합 (KRX 정규장 + NXT 대체거래소 통합 HTS 수치 100% 일치)
           }
         }),
         signal: AbortSignal.timeout(8000)
@@ -169,7 +174,7 @@ export async function fetchLSHtsPeriodicalPrices(token: string, shcode: string):
 
       if (res.ok) {
         const data = await res.json();
-        const rows = data.t8413OutBlock1 || data.t8413OutBlock;
+        const rows = data.t1305OutBlock1 || data.t1305OutBlock;
         if (Array.isArray(rows) && rows.length > 0) {
           rows.forEach((r: any) => {
             const rawDate = String(r.date || '').trim();
@@ -177,11 +182,39 @@ export async function fetchLSHtsPeriodicalPrices(token: string, shcode: string):
               ? `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`
               : rawDate;
             const closePrice = parseLSNumber(r.close);
-            const volume = parseLSNumber(r.jdiff_vol) || parseLSNumber(r.volume);
+            const openPrice = parseLSNumber(r.open);
+            const highPrice = parseLSNumber(r.high);
+            const lowPrice = parseLSNumber(r.low);
+            const volume = parseLSNumber(r.volume);
+            const change = parseLSNumber(r.change);
+            const diff = parseFloat(String(r.diff || 0));
+
             if (formattedDate && closePrice > 0) {
-              htsMap.set(formattedDate, { close: closePrice, volume });
+              htsMap.set(formattedDate, {
+                close: closePrice,
+                open: openPrice,
+                high: highPrice,
+                low: lowPrice,
+                volume,
+                change,
+                diff
+              });
             }
           });
+
+          // 오늘 날짜 데이터는 t1102 라이브 실시간가가 전달되면 덮어씀
+          if (externalLivePrice && externalLivePrice > 0) {
+            const todayStr = formatDateYYYYMMDD(new Date());
+            const formattedToday = `${todayStr.slice(0, 4)}-${todayStr.slice(4, 6)}-${todayStr.slice(6, 8)}`;
+            const existing = htsMap.get(formattedToday);
+            if (existing) {
+              htsMap.set(formattedToday, {
+                ...existing,
+                close: externalLivePrice
+              });
+            }
+          }
+
           if (htsMap.size > 0) return htsMap;
         }
       }
@@ -190,9 +223,15 @@ export async function fetchLSHtsPeriodicalPrices(token: string, shcode: string):
   return null;
 }
 
-// 3. Fetch Short Selling Details via LS API (t1927)
-export async function fetchLSShortSellDetailMap(token: string, shcode: string): Promise<Map<string, { balanceRatio: number; shortAvgPrice: number; apiPrice: number; volume: number }>> {
-  const detailMap = new Map<string, { balanceRatio: number; shortAvgPrice: number; apiPrice: number; volume: number }>();
+export const fetchLST8410SujungPrices = fetchLST1305Prices;
+export const fetchLSHtsPeriodicalPrices = fetchLST1305Prices;
+
+// 3. Fetch Short Selling Details via LS API (t1927) - 공매도 전용 지표만 수집
+export async function fetchLSShortSellDetailMap(
+  token: string,
+  shcode: string
+): Promise<Map<string, { balanceRatio: number; shortAvgPrice: number }>> {
+  const detailMap = new Map<string, { balanceRatio: number; shortAvgPrice: number }>();
   const rawCode = sanitizeDomesticShcode(shcode);
   if (!rawCode) return detailMap;
 
@@ -202,8 +241,8 @@ export async function fetchLSShortSellDetailMap(token: string, shcode: string): 
   const sdate = formatDateYYYYMMDD(past);
 
   const urls = [
-    'https://openapi.ls-sec.co.kr/stock/etc',
-    'https://openapi.ls-sec.co.kr:8080/stock/etc'
+    'https://openapi.ls-sec.co.kr:8080/stock/etc',
+    'https://openapi.ls-sec.co.kr/stock/etc'
   ];
 
   for (const url of urls) {
@@ -236,13 +275,11 @@ export async function fetchLSShortSellDetailMap(token: string, shcode: string): 
               ? `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`
               : rawDate;
             
-            const balanceRatio = parseLSNumber(r.gm_per) || parseLSNumber(r.ms_m_rate) || parseLSNumber(r.ms_rate);
-            const shortAvgPrice = parseLSNumber(r.gm_avg) || parseLSNumber(r.price);
-            const apiPrice = parseLSNumber(r.price) || parseLSNumber(r.close);
-            const volume = parseLSNumber(r.volume);
+            const balanceRatio = parseLSNumberOrUndefined(r.gm_per) ?? parseLSNumberOrUndefined(r.ms_m_rate) ?? parseLSNumberOrUndefined(r.ms_rate) ?? 0;
+            const shortAvgPrice = parseLSNumberOrUndefined(r.gm_avg) ?? parseLSNumberOrUndefined(r.price) ?? 0;
 
             if (formattedDate) {
-              detailMap.set(formattedDate, { balanceRatio, shortAvgPrice, apiPrice, volume });
+              detailMap.set(formattedDate, { balanceRatio, shortAvgPrice });
             }
           });
           if (detailMap.size > 0) break;
@@ -253,42 +290,44 @@ export async function fetchLSShortSellDetailMap(token: string, shcode: string): 
   return detailMap;
 }
 
-// HTS 수정주가 종목별 정밀 매핑 (NAVER 035420 HTS 정밀 보정)
-const SPECIFIC_STOCK_CORRECTIONS: Record<string, Record<string, { price: number; shortAvgPrice?: number }>> = {
-  '035420': {
-    '2026-08-12': { price: 217000, shortAvgPrice: 215500 },
-    '2026-08-11': { price: 213500, shortAvgPrice: 214000 },
-    '2026-08-10': { price: 211500, shortAvgPrice: 211500 },
-    '2026-08-07': { price: 211000, shortAvgPrice: 210000 }
-  }
-};
-
-// 4. Fetch Short Selling Trend
-export async function fetchLSShortSellTrend(token: string, shcode: string): Promise<ShortSellRecord[] | null> {
+// 4. Fetch Short Selling Trend (t1305 주식 시세 + t1927 공매도 분리 결합)
+export async function fetchLSShortSellTrend(
+  token: string,
+  shcode: string,
+  externalLivePrice?: number | null
+): Promise<ShortSellRecord[] | null> {
   const rawCode = sanitizeDomesticShcode(shcode);
   if (!rawCode) return null;
 
   try {
-    const htsPriceMap = await fetchLSHtsPeriodicalPrices(token, shcode);
+    const livePrice = externalLivePrice !== undefined ? externalLivePrice : await fetchLSPrice(token, shcode);
+    const htsPriceMap = await fetchLST1305Prices(token, shcode, livePrice);
     const shortDetailMap = await fetchLSShortSellDetailMap(token, shcode);
-    const stockCorrections = SPECIFIC_STOCK_CORRECTIONS[rawCode];
+
+    const todayStr = formatDateYYYYMMDD(new Date());
+    const formattedToday = `${todayStr.slice(0, 4)}-${todayStr.slice(4, 6)}-${todayStr.slice(6, 8)}`;
 
     const allDates = new Set<string>([
       ...(htsPriceMap ? Array.from(htsPriceMap.keys()) : []),
-      ...Array.from(shortDetailMap.keys()),
-      ...(stockCorrections ? Object.keys(stockCorrections) : [])
+      ...Array.from(shortDetailMap.keys())
     ]);
 
     if (allDates.size > 0) {
       const combinedRecords: ShortSellRecord[] = Array.from(allDates).map((date) => {
         const hts = htsPriceMap?.get(date);
         const shortDetail = shortDetailMap.get(date);
-        const corrected = stockCorrections?.[date];
 
-        const price = corrected?.price || hts?.close || shortDetail?.apiPrice || 0;
-        const shortAvgPrice = corrected?.shortAvgPrice || shortDetail?.shortAvgPrice || undefined;
-        const volume = hts?.volume || shortDetail?.volume || 0;
-        const balanceRatio = shortDetail?.balanceRatio || 0;
+        // 시세 종가 및 거래량은 오직 t1305 원본에서 추출
+        let price = hts?.close || 0;
+        let volume = hts?.volume || 0;
+
+        // 오늘 날짜 데이터는 t1102 라이브 실시간가로 덮어써서 메인 종가와 통일
+        if (date === formattedToday && livePrice && livePrice > 0) {
+          price = livePrice;
+        }
+
+        const shortAvgPrice = shortDetail?.shortAvgPrice ? shortDetail.shortAvgPrice : undefined;
+        const balanceRatio = shortDetail?.balanceRatio ?? 0;
 
         return {
           date,

@@ -290,31 +290,44 @@ const errorMessage = ref<string | null>(null);
 const stockData = ref<any>(null);
 const aiAnalysis = ref<CalculatedAnalysisResult | null>(null);
 
+const stockDetailStore = useStockDetailStore();
 const { analyzeStockWithClaude, analysisError } = useStockAnalysis();
 
 onMounted(async () => {
+  stockDetailStore.initFromStorage();
+  
+  // 1. LocalStorage 캐시 데이터가 있으면 새로고침 즉시 화면 표기
+  const cached = stockDetailStore.getStockCache(props.shcode);
+  if (cached) {
+    stockData.value = cached;
+    isLoading.value = false;
+  }
+
+  // 2. 백그라운드로 실시간 시세 및 수급 수집 후 LocalStorage/Store 갱신 및 화면 업데이트
   await loadStockDetail();
 });
 
 async function loadStockDetail() {
   if (!props.shcode) return;
-  isLoading.value = true;
+  if (!stockData.value) {
+    isLoading.value = true;
+  }
   errorMessage.value = null;
 
   try {
-    const res = await $fetch<{ success: boolean; data: any }>(`/api/stock/${props.shcode}`);
-    if (res && res.success && res.data) {
-      stockData.value = res.data;
+    const updated = await stockDetailStore.fetchAndCacheStock(props.shcode);
+    if (updated) {
+      stockData.value = updated;
 
-      // composable을 통한 비즈니스 분석 및 판단 계산 수행
-      const result = await analyzeStockWithClaude(res.data);
+      // AI 퀀트 판단 수행 및 업데이트
+      const result = await analyzeStockWithClaude(updated as any);
       if (result) {
         aiAnalysis.value = result;
       } else if (analysisError.value) {
         errorMessage.value = `[Claude AI 연동 경고]: ${analysisError.value}`;
       }
-    } else {
-      errorMessage.value = '종목 상세 데이터를 불러오지 못했습니다.';
+    } else if (stockDetailStore.errorMessage) {
+      errorMessage.value = stockDetailStore.errorMessage;
     }
   } catch (err: any) {
     console.error('Stock detail error:', err);

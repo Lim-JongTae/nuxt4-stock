@@ -29,7 +29,8 @@ export interface StockItem {
   createdAt: string;
 }
 
-const STORAGE_KEY = 'nuxt4_stock_screener_cache';
+const STORAGE_KEY = 'nuxt4_stock_screener_cache_v2';
+const EXPIRATION_MS = 30 * 24 * 60 * 60 * 1000; // 30일 보존 정책
 
 export const useScreenerStore = defineStore('screener', {
   state: () => ({
@@ -37,6 +38,7 @@ export const useScreenerStore = defineStore('screener', {
     newData: [] as StockItem[],
     isRefreshing: false,
     lastUpdated: '',
+    cachedTimestamp: 0,
     sourceProvider: 'LS증권 Open API (openapi.ls-sec.co.kr)',
     errorMessage: null as string | null
   }),
@@ -60,13 +62,18 @@ export const useScreenerStore = defineStore('screener', {
   },
 
   actions: {
-    // 최초 진입 시 스토리지/캐시 데이터 불러오기
+    // 최초 진입 시 스토리지/캐시 데이터 불러오기 (30일 초과 시 자동 삭제)
     initFromStorage() {
       if (typeof window === 'undefined') return;
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);
+          const now = Date.now();
+          if (parsed.cachedTimestamp && now - parsed.cachedTimestamp > EXPIRATION_MS) {
+            localStorage.removeItem(STORAGE_KEY);
+            return;
+          }
           if (parsed.newData && Array.isArray(parsed.newData)) {
             this.newData = parsed.newData;
           }
@@ -74,6 +81,7 @@ export const useScreenerStore = defineStore('screener', {
             this.oldData = parsed.oldData;
           }
           this.lastUpdated = parsed.lastUpdated || '';
+          this.cachedTimestamp = parsed.cachedTimestamp || 0;
           this.sourceProvider = parsed.sourceProvider || this.sourceProvider;
         }
       } catch (e) {
@@ -81,14 +89,16 @@ export const useScreenerStore = defineStore('screener', {
       }
     },
 
-    // 데이터를 스토리지에 보관
+    // 데이터를 스토리지에 30일 보관
     saveToStorage() {
       if (typeof window === 'undefined') return;
       try {
+        this.cachedTimestamp = Date.now();
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
           newData: this.newData,
           oldData: this.oldData,
           lastUpdated: this.lastUpdated,
+          cachedTimestamp: this.cachedTimestamp,
           sourceProvider: this.sourceProvider
         }));
       } catch (e) {
