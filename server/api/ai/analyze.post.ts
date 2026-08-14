@@ -29,8 +29,17 @@ export default defineEventHandler(async (event) => {
 
   const apiKey = env.ANTHROPIC_API_KEY;
   const baseUrl = (env.ANTHROPIC_BASE_URL || 'https://api.oneprovider.dev').replace(/\/$/, '');
-  const model = env.ANTHROPIC_MODEL || body.model || 'claude-sonnet-4-6';
+  let model = String(env.ANTHROPIC_MODEL || body.model || 'claude-sonnet-5').trim();
   const prompt: string = body.prompt || '안녕하세요';
+
+  const validModels = [
+    'claude-haiku-4-5', 'claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-opus-5',
+    'claude-opus-4-8', 'claude-opus-4-8-thinking', 'claude-fable-5'
+  ];
+
+  if (!model || !validModels.includes(model)) {
+    model = 'claude-sonnet-5';
+  }
 
     if (!apiKey) {
     throw createError({

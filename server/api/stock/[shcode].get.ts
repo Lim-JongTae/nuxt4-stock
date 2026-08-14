@@ -1,10 +1,9 @@
 import { defineEventHandler, createError } from 'h3';
 import { db } from '../../db';
-import { screenerHistory, holdings } from '../../db/schema';
+import { screenerHistory, holdings, stocks } from '../../db/schema';
 import { desc, eq } from 'drizzle-orm';
-import { loadEnv, getLSToken, fetchLSPrice, fetchLSShortSellTrend } from '../../utils/lsApi';
+import { loadEnv, getLSToken, fetchLSPrice, fetchLST1305Prices, fetchLSShortSellTrend, calculateTechnicalIndicators } from '../../utils/lsApi';
 import { classifyShortSellSignal, type ShortSellRecord } from '../../utils/shortSellSignal';
-import { parseStockMd } from '../../utils/stockMdParser';
 
 export default defineEventHandler(async (event) => {
   const shcode = event.context.params?.shcode;
@@ -16,29 +15,19 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  // 1. 종목.md 파싱 & holdings DB 조회하여 보유 상태 판별
-  const parsedMd = parseStockMd();
-  const holdingInMd = parsedMd.holdings.find(h => h.shcode === shcode || h.shcode.replace(/^A/, '') === shcode.replace(/^A/, ''));
-  const watchlistInMd = parsedMd.watchlist.find(w => w.shcode === shcode || w.shcode.replace(/^A/, '') === shcode.replace(/^A/, ''));
+  const cleanParam = String(shcode).trim().replace(/^A/i, '');
 
-  let isHolding = !!holdingInMd;
-  let holdingQuantity = holdingInMd ? holdingInMd.quantity : 0;
-  let holdingAvgPrice = holdingInMd ? holdingInMd.avgPrice : 0;
+  // 1. SQLite DB (stocks 테이블) 조회를 통해 종목 마스터 및 보유 상태 판별
+  const dbStockList = await db.select().from(stocks);
+  const foundStock = dbStockList.find(s => s.shcode.replace(/^A/i, '') === cleanParam);
 
-  try {
-    const dbHoldings = await db.select().from(holdings).where(eq(holdings.shcode, shcode));
-    const firstRow = dbHoldings[0];
-    if (firstRow) {
-      isHolding = true;
-      holdingQuantity = firstRow.quantity ?? 0;
-      holdingAvgPrice = firstRow.avgPrice ?? 0;
-    }
-  } catch (e) {}
+  let isHolding = foundStock ? foundStock.type === 'holding' : false;
+  let holdingQuantity = foundStock ? foundStock.quantity || 0 : 0;
+  let holdingAvgPrice = foundStock ? foundStock.avgPrice || 0 : 0;
+  const name = foundStock ? foundStock.name : shcode;
+  const industry = foundStock ? foundStock.industry || '주요업종' : '주요업종';
 
-  const name = holdingInMd?.name || watchlistInMd?.name || shcode;
-  const industry = holdingInMd?.industry || watchlistInMd?.industry || '주요업종';
-
-  // 2. LS증권 API 실시간 시세 (t1102, t8413 일봉차트) & 공매도 추이 (t1927) 조회
+  // 2. LS증권 API 실시간 시세 (t1102 실시간가, t1305 65일봉) & 공매도 추이 (t1927) 조회
   const env = loadEnv();
   const appKey = env.LS_APP_KEY || '';
   const appSecret = env.LS_SECREAT || '';
@@ -47,11 +36,14 @@ export default defineEventHandler(async (event) => {
 
   let livePrice: number | null = null;
   let liveShortSellHistory: ShortSellRecord[] | null = null;
+  let liveIndicators: any = null;
   let apiErrorMessage: string | null = tokenError || null;
 
   if (token) {
     try {
       livePrice = await fetchLSPrice(token, shcode);
+      const htsPriceMap = await fetchLST1305Prices(token, shcode, livePrice);
+      liveIndicators = calculateTechnicalIndicators(htsPriceMap);
       liveShortSellHistory = await fetchLSShortSellTrend(token, shcode, livePrice);
       if ((!liveShortSellHistory || liveShortSellHistory.length === 0) && !livePrice) {
         apiErrorMessage = `LS증권 실시간 수급 데이터 수신 대기 중 (종목: ${name})`;
@@ -97,16 +89,16 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  // 4. 지표 값 결합 (더미 생성 완전 제거 -> 결측치는 null)
-  const psy = prevDbData.psy ?? null;
-  const bbLower = prevDbData.bbLower ?? null;
-  const ma5 = prevDbData.ma5 ?? null;
-  const ma20 = prevDbData.ma20 ?? null;
-  const ma60 = prevDbData.ma60 ?? null;
-  const volumeRatio = prevDbData.volumeRatio ?? null;
-  const macdHist = prevDbData.macdHist ?? null;
-  const rsi = prevDbData.rsi ?? null;
-  const bullishDivergence = prevDbData.bullishDivergence !== undefined && prevDbData.bullishDivergence !== null ? Boolean(prevDbData.bullishDivergence) : null;
+  // 4. 8대 지표 동적 결합 (오직 LS증권 t1305 실시간 파싱값만 사용! 과거 DB 예전 더미 125%/31 절대 참조 금지)
+  const psy = liveIndicators?.psy ?? null;
+  const bbLower = liveIndicators?.bbLower ?? null;
+  const ma5 = liveIndicators?.ma5 ?? null;
+  const ma20 = liveIndicators?.ma20 ?? null;
+  const ma60 = liveIndicators?.ma60 ?? null;
+  const volumeRatio = liveIndicators?.volumeRatio ?? null;
+  const macdHist = liveIndicators?.macdHist ?? null;
+  const rsi = liveIndicators?.rsi ?? null;
+  const bullishDivergence = liveIndicators?.bullishDivergence ?? null;
 
   let shortSellHistory: ShortSellRecord[] = liveShortSellHistory || [];
   if (shortSellHistory && shortSellHistory.length > 0) {

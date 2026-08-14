@@ -116,7 +116,30 @@ try {
   console.error('[DB Migration Error]', e);
 }
 
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS stocks (
+    shcode TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    industry TEXT DEFAULT '기타',
+    type TEXT NOT NULL,
+    avg_price REAL DEFAULT 0,
+    quantity INTEGER DEFAULT 0,
+    target_price REAL DEFAULT 0,
+    stop_price REAL DEFAULT 0,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS portfolio_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    shcode TEXT NOT NULL,
+    action_type TEXT NOT NULL,
+    message TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+`);
+
 export const db = drizzle(sqlite, { schema });
+export const sqliteDb = sqlite;
 
 // Seed initial holdings matching 종목.md (보유종목 2개)
 // 주의: 이전 버전은 매 모듈 로드(서버 재시작/재빌드/HMR 등)마다 무조건

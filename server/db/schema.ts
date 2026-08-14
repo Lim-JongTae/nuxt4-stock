@@ -57,3 +57,25 @@ export const watchlist = sqliteTable('watchlist', {
   industry: text('industry'),
   createdAt: text('created_at').notNull(),
 });
+
+// 5. Integrated Master Stocks Table (보유종목 & 관심종목 통합 마스터 DB)
+export const stocks = sqliteTable('stocks', {
+  shcode: text('shcode').primaryKey(),
+  name: text('name').notNull(),
+  industry: text('industry').default('기타'),
+  type: text('type').notNull(), // 'holding' (보유종목) 또는 'watchlist' (관심종목)
+  avgPrice: real('avg_price').default(0),
+  quantity: integer('quantity').default(0),
+  targetPrice: real('target_price').default(0),
+  stopPrice: real('stop_price').default(0),
+  updatedAt: text('updated_at').notNull()
+});
+
+// 6. Portfolio Activity Logs Table (포트폴리오 변동 매매 이력 로그 DB)
+export const portfolioLogs = sqliteTable('portfolio_logs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  shcode: text('shcode').notNull(),
+  actionType: text('action_type').notNull(), // 'ADD', 'UPDATE', 'DELETE'
+  message: text('message').notNull(),
+  createdAt: text('created_at').notNull()
+});

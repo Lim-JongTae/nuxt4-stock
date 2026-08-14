@@ -9,7 +9,10 @@
             <span class="px-2.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 font-bold text-xs">
               <i class="fas fa-chart-pie mr-1"></i> 메인 대시보드 Overview
             </span>
-            <span class="text-xs text-slate-400">자산 현황 & 종합 시장 대응 전략</span>
+            <span class="px-2.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold text-xs flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>수집시각: {{ screenerStore.lastUpdated || '실시간 시세 수집 완료' }} (Store 중앙집중 관리)</span>
+            </span>
           </div>
           <h2 class="text-2xl font-extrabold text-white tracking-tight">
             실시간 자산 현황 및 AI 시장 종합 분석
@@ -18,7 +21,13 @@
             LS증권 Open API 실시간 시세와 6대 기술적 지표 및 Anthropic Claude 퀀트 진단 결과를 실시간 브리핑합니다.
           </p>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex flex-wrap items-center gap-3">
+          <button 
+            @click="openAddModal"
+            class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
+          >
+            <i class="fas fa-plus-circle"></i> 종목 추가 / 편집
+          </button>
           <NuxtLink to="/portfolio" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-500/20 flex items-center gap-2 transition-all active:scale-95">
             <i class="fas fa-wallet"></i> 보유종목 상세관리
           </NuxtLink>
@@ -180,8 +189,8 @@
             </div>
 
             <div class="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-900">
-              <span>RSI: <strong class="text-cyan-400">{{ item.rsi }}</strong></span>
-              <span>거래량: <strong class="text-amber-400">{{ item.volumeRatio }}%</strong></span>
+              <span>RSI: <strong class="text-cyan-400">{{ typeof item.rsi === 'number' ? item.rsi : 'N/A' }}</strong></span>
+              <span>거래량: <strong class="text-amber-400">{{ typeof item.volumeRatio === 'number' ? item.volumeRatio + '%' : 'N/A' }}</strong></span>
               <NuxtLink to="/screener" class="text-indigo-400 hover:underline text-[10px] font-bold">상세보기 &rarr;</NuxtLink>
             </div>
           </div>
@@ -189,15 +198,38 @@
       </div>
 
     </div>
+
+    <!-- Stock Edit / Add Modal Component -->
+    <StockEditModal 
+      :is-open="isModalOpen" 
+      :initial-data="selectedStockForEdit"
+      @close="isModalOpen = false"
+      @saved="handleStockSaved"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref, onMounted } from 'vue';
 import { usePortfolioStore } from '~/stores/usePortfolioStore';
 import { useScreenerStore } from '~/stores/useScreenerStore';
+import StockEditModal, { type StockItemForm } from '~/components/StockEditModal.vue';
 
 const portfolioStore = usePortfolioStore();
 const screenerStore = useScreenerStore();
+
+const isModalOpen = ref(false);
+const selectedStockForEdit = ref<StockItemForm | null>(null);
+
+function openAddModal() {
+  selectedStockForEdit.value = null;
+  isModalOpen.value = true;
+}
+
+async function handleStockSaved() {
+  await portfolioStore.fetchHoldings();
+  await screenerStore.refreshScreener();
+}
 
 onMounted(async () => {
   await portfolioStore.fetchHoldings();

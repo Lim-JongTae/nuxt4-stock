@@ -31,8 +31,16 @@ export interface StockItem {
   createdAt: string;
 }
 
-const STORAGE_KEY = 'nuxt4_stock_screener_cache_v2';
-const EXPIRATION_MS = 30 * 24 * 60 * 60 * 1000; // 30일 보존 정책
+const KEY_PREFIX = 'nuxt4_stock_screener_';
+const EXPIRATION_MS = 15 * 24 * 60 * 60 * 1000; // 15일 보존 정책 (15일 이상 초과 시에만 자동 제거)
+
+function getTodayKey(): string {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${KEY_PREFIX}${year}-${month}-${day}`;
+}
 
 export const useScreenerStore = defineStore('screener', {
   state: () => ({
@@ -64,18 +72,41 @@ export const useScreenerStore = defineStore('screener', {
   },
 
   actions: {
-    // 최초 진입 시 스토리지/캐시 데이터 불러오기 (30일 초과 시 자동 삭제)
+    // 최초 진입 시 스토리지/캐시 데이터 불러오기 (1일 1개 보존 & 15일 이상 경과 데이터만 자동 제거)
     initFromStorage() {
       if (typeof window === 'undefined') return;
       try {
-        const saved = localStorage.getItem(STORAGE_KEY);
+        const now = Date.now();
+        const validDailyKeys: string[] = [];
+
+        // 1. 15일 이상 경과한 과거 일별 데이터만 자동 제거 (15일 이내 타 날짜 1일1개 데이터는 100% 보존)
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (key.startsWith(KEY_PREFIX) || key.startsWith('nuxt4_stock_screener_cache'))) {
+            const raw = localStorage.getItem(key);
+            if (raw) {
+              try {
+                const parsed = JSON.parse(raw);
+                if (parsed.cachedTimestamp && now - parsed.cachedTimestamp > EXPIRATION_MS) {
+                  localStorage.removeItem(key); // 15일 초과 데이터만 삭제
+                } else if (key.startsWith(KEY_PREFIX)) {
+                  validDailyKeys.push(key);
+                }
+              } catch (e) {
+                // 파싱 오류 파일 정리
+                localStorage.removeItem(key);
+              }
+            }
+          }
+        }
+
+        // 2. 가장 최근 날짜의 1일 1개 데이터 불러오기
+        const todayKey = getTodayKey();
+        const targetKey = localStorage.getItem(todayKey) ? todayKey : (validDailyKeys.sort().pop() || todayKey);
+        const saved = localStorage.getItem(targetKey);
+
         if (saved) {
           const parsed = JSON.parse(saved);
-          const now = Date.now();
-          if (parsed.cachedTimestamp && now - parsed.cachedTimestamp > EXPIRATION_MS) {
-            localStorage.removeItem(STORAGE_KEY);
-            return;
-          }
           if (parsed.newData && Array.isArray(parsed.newData)) {
             this.newData = parsed.newData;
           }
@@ -91,12 +122,13 @@ export const useScreenerStore = defineStore('screener', {
       }
     },
 
-    // 데이터를 스토리지에 30일 보관
+    // 데이터를 스토리지에 당일 1일 1개 덮어쓰기로 15일간 보관
     saveToStorage() {
       if (typeof window === 'undefined') return;
       try {
         this.cachedTimestamp = Date.now();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        const todayKey = getTodayKey(); // 예: nuxt4_stock_screener_2026-08-14 (당일 1개 저장)
+        localStorage.setItem(todayKey, JSON.stringify({
           newData: this.newData,
           oldData: this.oldData,
           lastUpdated: this.lastUpdated,

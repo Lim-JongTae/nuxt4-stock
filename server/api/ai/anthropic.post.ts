@@ -28,8 +28,8 @@ export default defineEventHandler(async (event): Promise<AnthropicApiResponse> =
 
   const env = loadEnv();
   const apiKey = env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY || '';
-  const rawBaseUrl = env.ANTHROPIC_BASE_URL || process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com';
-  const defaultModel = env.ANTHROPIC_MODEL || process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20241022';
+  const rawBaseUrl = env.ANTHROPIC_BASE_URL || process.env.ANTHROPIC_BASE_URL || 'https://api.oneprovider.dev';
+  const defaultModel = (env.ANTHROPIC_MODEL || process.env.ANTHROPIC_MODEL || 'claude-sonnet-5').trim();
 
   if (!apiKey) {
     throw createError({
@@ -44,9 +44,20 @@ export default defineEventHandler(async (event): Promise<AnthropicApiResponse> =
     targetUrl = `${targetUrl.replace(/\/+$/, '')}/v1/messages`;
   }
 
-  const model = body.model || defaultModel;
+  let model = (body.model || defaultModel).trim();
   const temperature = body.temperature ?? 0.2;
   const maxTokens = body.maxTokens || 1000;
+
+  // API 게이트웨이(api.oneprovider.dev) 유효 모델 샌드박스 방어 로직
+  const validModels = [
+    'claude-haiku-4-5', 'claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-opus-5',
+    'claude-opus-4-8', 'claude-opus-4-8-thinking', 'claude-fable-5'
+  ];
+
+  if (!model || !validModels.includes(model)) {
+    console.warn(`[API Safeguard] 요청된 모델명('${model}')이 백엔드 허용 목록에 없습니다. 'claude-sonnet-5'로 자동 교정합니다.`);
+    model = 'claude-sonnet-5';
+  }
 
   const payload: any = {
     model,

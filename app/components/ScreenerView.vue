@@ -222,7 +222,7 @@
                   </div>
                 </td>
                 <td class="px-3 py-3 text-indigo-400 font-semibold text-[11px]">
-                  콘탱고 (+1.25)
+                  LS증권 라이브 수급
                 </td>
                 
                 <td class="px-3 py-3 text-center">
@@ -307,8 +307,8 @@
                 <td class="px-3 py-3">{{ item.psy }}%</td>
                 <td class="px-3 py-3 font-mono text-slate-400">{{ Number(item.bbLower).toLocaleString() }}원</td>
                 <td class="px-3 py-3 text-emerald-400 font-semibold">정배열 지지</td>
-                <td class="px-3 py-3 font-bold" :class="(item.volumeRatio || 0) >= 120 ? 'text-amber-400 font-extrabold' : 'text-slate-300'">
-                  {{ item.volumeRatio || 120 }}%
+                <td class="px-3 py-3 font-bold" :class="typeof item.volumeRatio === 'number' && item.volumeRatio >= 120 ? 'text-amber-400 font-extrabold' : 'text-slate-300'">
+                  {{ typeof item.volumeRatio === 'number' ? item.volumeRatio + '%' : 'N/A' }}
                 </td>
                 <td class="px-3 py-3">+{{ item.macdHist }}</td>
                 <td class="px-3 py-3">{{ item.rsi }}</td>

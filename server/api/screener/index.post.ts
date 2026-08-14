@@ -1,7 +1,6 @@
 import { db } from '../../db';
-import { screenerHistory } from '../../db/schema';
+import { screenerHistory, stocks } from '../../db/schema';
 import { desc } from 'drizzle-orm';
-import { parseStockMd } from '../../utils/stockMdParser';
 import { loadEnv, getLSToken, fetchLSPrice, fetchLSShortSellTrend } from '../../utils/lsApi';
 import { classifyShortSellSignal, type ShortSellRecord } from '../../utils/shortSellSignal';
 
@@ -12,21 +11,25 @@ export default defineEventHandler(async (event) => {
 
   const { token, error: tokenError } = await getLSToken(appKey, appSecret);
 
-  // 1. 종목.md 에서 보유종목 + 관심종목 리스트 동적 로드
-  const parsedMd = parseStockMd();
-  const allMdStocks = [
-    ...parsedMd.holdings.map(h => ({ name: h.name, shcode: h.shcode, industry: h.industry, isHolding: true, avgPrice: h.avgPrice, quantity: h.quantity })),
-    ...parsedMd.watchlist.map(w => ({ name: w.name, shcode: w.shcode, industry: w.industry, isHolding: false, avgPrice: 0, quantity: 0 }))
-  ];
-
-  const candidateStocks = allMdStocks.filter(s => s.shcode && s.shcode.trim().length >= 4);
+  // 1. SQLite DB (stocks 테이블)에서 보유종목 + 관심종목 동적 로드
+  const dbStocks = await db.select().from(stocks);
+  const candidateStocks = dbStocks
+    .map(s => ({
+      name: s.name,
+      shcode: s.shcode,
+      industry: s.industry || '기타',
+      isHolding: s.type === 'holding',
+      avgPrice: s.avgPrice || 0,
+      quantity: s.quantity || 0
+    }))
+    .filter(s => s.shcode && s.shcode.trim().length >= 4);
 
   if (candidateStocks.length === 0) {
     return {
       success: false,
       timestamp: new Date().toLocaleString('ko-KR'),
-      source: '종목.md 없음',
-      error: '종목.md 파일에 유효한 종목 목록이 존재하지 않습니다.',
+      source: 'DB stocks 테이블 빈 상태',
+      error: 'SQLite DB stocks 테이블에 종목 정보가 존재하지 않습니다.',
       oldData: [],
       newData: []
     };
@@ -49,23 +52,28 @@ export default defineEventHandler(async (event) => {
     }
   } catch (e) {}
 
-  // 3. LS증권 Open API (t1102, t8413 실시간가 + t1927 공매도일별추이) 연동
+  // 3. LS증권 Open API (t1102 실시간가, t1305 65일봉, t1927 공매도일별추이) 연동
   let apiCallNote = '';
   let priceFailCount = 0;
-  const stockLiveMap = new Map<string, { price?: number; shortSellHistory?: ShortSellRecord[] }>();
+  const stockLiveMap = new Map<string, { price?: number; indicators?: any; shortSellHistory?: ShortSellRecord[] }>();
 
   if (token) {
-    const BATCH_SIZE = 3;
-    const BATCH_DELAY_MS = 250;
+    const BATCH_SIZE = 1;
+    const BATCH_DELAY_MS = 650; // LS API 초당 건수 제한 준수
 
     for (let i = 0; i < candidateStocks.length; i += BATCH_SIZE) {
       const batch = candidateStocks.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(batch.map(async (stock) => {
         const livePrice = await fetchLSPrice(token, stock.shcode);
+        const htsPriceMap = await fetchLST1305Prices(token, stock.shcode, livePrice);
+        const indicators = calculateTechnicalIndicators(htsPriceMap);
         const shortSellTrend = await fetchLSShortSellTrend(token, stock.shcode, livePrice);
 
+        const latestPrice = livePrice || (htsPriceMap && htsPriceMap.size > 0 ? Array.from(htsPriceMap.values())[0]?.close : undefined);
+
         stockLiveMap.set(stock.shcode, {
-          price: livePrice || undefined,
+          price: latestPrice,
+          indicators,
           shortSellHistory: shortSellTrend || undefined
         });
       }));
@@ -99,24 +107,24 @@ export default defineEventHandler(async (event) => {
   const localTime = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
   const batchId = localTime.replace(/[- :]/g, '');
 
-  // 5. 8대 기술적 지표 & 공매도 수급 퀀트 스코어 산정 (더미 가짜 데이터 전면 배제)
+  // 5. 8대 기술적 지표 & 공매도 수급 퀀트 스코어 산정 (더미 가짜 데이터 전면 배제, t1305 실시세 파싱)
   const newBatch = candidateStocks.map(s => {
     const prevDbData = lastBatchRowsMap.get(s.shcode) || {};
     const liveData = stockLiveMap.get(s.shcode) || {};
 
-    // 현재가 (LS증권 실시간가 -> DB 직전 실시간가 순)
-    const closePrice = liveData.price || (liveData.shortSellHistory && liveData.shortSellHistory[0]?.price) || prevDbData.closePrice || 0;
+    // 현재가 (LS증권 실시간가 -> liveData의 시세만 사용, 더미 10000원 방지)
+    const closePrice = liveData.price || (liveData.shortSellHistory && liveData.shortSellHistory[0]?.price) || (prevDbData.closePrice && prevDbData.closePrice !== 10000 ? prevDbData.closePrice : 0);
 
-    // 지표 값 수집 (결측치는 null 유지, 가짜 대체값 생성 안 함)
-    const psy = prevDbData.psy ?? null;
-    const bb_lower = prevDbData.bbLower ?? null;
-    const ma5 = prevDbData.ma5 ?? null;
-    const ma20 = prevDbData.ma20 ?? null;
-    const ma60 = prevDbData.ma60 ?? null;
-    const volume_ratio = prevDbData.volumeRatio ?? null;
-    const macd_hist = prevDbData.macdHist ?? null;
-    const rsi = prevDbData.rsi ?? null;
-    const bullish_divergence = prevDbData.bullishDivergence !== undefined && prevDbData.bullishDivergence !== null ? Boolean(prevDbData.bullishDivergence) : null;
+    // 8대 기술적 지표 수집 (오직 LS증권 t1305 실시간 파싱값만 사용! 예전 DB의 더미 125%/31 수치는 절대 참조 금지)
+    const psy = liveData.indicators?.psy ?? null;
+    const bb_lower = liveData.indicators?.bbLower ?? null;
+    const ma5 = liveData.indicators?.ma5 ?? null;
+    const ma20 = liveData.indicators?.ma20 ?? null;
+    const ma60 = liveData.indicators?.ma60 ?? null;
+    const volume_ratio = liveData.indicators?.volumeRatio ?? null;
+    const macd_hist = liveData.indicators?.macdHist ?? null;
+    const rsi = liveData.indicators?.rsi ?? null;
+    const bullish_divergence = liveData.indicators?.bullishDivergence ?? null;
 
     // 공매도 일별 이력 (실수신 실데이터만 사용)
     let shortSellHistory: ShortSellRecord[] = liveData.shortSellHistory || [];

@@ -183,52 +183,52 @@
         </h3>
 
         <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
-          <div class="bg-slate-950/80 border p-3 rounded-xl space-y-1" :class="stockData.conditions.cond_psy ? 'border-emerald-500/50 bg-emerald-950/20' : 'border-slate-800'">
-            <div class="text-[11px] font-bold" :class="stockData.conditions.cond_psy ? 'text-emerald-400' : 'text-slate-400'">1. 심리선</div>
-            <div class="text-xs font-black text-white">{{ stockData.psy !== null ? stockData.psy + '%' : 'N/A' }}</div>
-            <div class="text-[9px]" :class="stockData.conditions.cond_psy ? 'text-emerald-400 font-bold' : 'text-slate-500'">{{ stockData.conditions.cond_psy ? '과매도 합격' : '미달성' }}</div>
+          <div class="bg-slate-950/80 border p-3 rounded-xl space-y-1" :class="stockData?.conditions?.cond_psy ? 'border-emerald-500/50 bg-emerald-950/20' : 'border-slate-800'">
+            <div class="text-[11px] font-bold" :class="stockData?.conditions?.cond_psy ? 'text-emerald-400' : 'text-slate-400'">1. 심리선</div>
+            <div class="text-xs font-black text-white">{{ stockData?.psy !== null && stockData?.psy !== undefined ? stockData.psy + '%' : 'N/A' }}</div>
+            <div class="text-[9px]" :class="stockData?.conditions?.cond_psy ? 'text-emerald-400 font-bold' : 'text-slate-500'">{{ stockData?.conditions?.cond_psy ? '과매도 합격' : '미달성' }}</div>
           </div>
 
-          <div class="bg-slate-950/80 border p-3 rounded-xl space-y-1" :class="stockData.conditions.cond_bb ? 'border-emerald-500/50 bg-emerald-950/20' : 'border-slate-800'">
-            <div class="text-[11px] font-bold" :class="stockData.conditions.cond_bb ? 'text-emerald-400' : 'text-slate-400'">2. 볼린저하단</div>
-            <div class="text-xs font-black text-white">{{ stockData.bbLower ? stockData.bbLower.toLocaleString() + '원' : 'N/A' }}</div>
-            <div class="text-[9px]" :class="stockData.conditions.cond_bb ? 'text-emerald-400 font-bold' : 'text-slate-500'">{{ stockData.conditions.cond_bb ? '하단 지지' : '미달성' }}</div>
+          <div class="bg-slate-950/80 border p-3 rounded-xl space-y-1" :class="stockData?.conditions?.cond_bb ? 'border-emerald-500/50 bg-emerald-950/20' : 'border-slate-800'">
+            <div class="text-[11px] font-bold" :class="stockData?.conditions?.cond_bb ? 'text-emerald-400' : 'text-slate-400'">2. 볼린저하단</div>
+            <div class="text-xs font-black text-white">{{ stockData?.bbLower ? Number(stockData.bbLower).toLocaleString() + '원' : 'N/A' }}</div>
+            <div class="text-[9px]" :class="stockData?.conditions?.cond_bb ? 'text-emerald-400 font-bold' : 'text-slate-500'">{{ stockData?.conditions?.cond_bb ? '하단 지지' : '미달성' }}</div>
           </div>
 
-          <div class="bg-slate-950/80 border p-3 rounded-xl space-y-1" :class="stockData.conditions.cond_ma_turn ? 'border-emerald-500/50 bg-emerald-950/20' : 'border-slate-800'">
-            <div class="text-[11px] font-bold" :class="stockData.conditions.cond_ma_turn ? 'text-emerald-400' : 'text-slate-400'">3. 이평선정배열</div>
+          <div class="bg-slate-950/80 border p-3 rounded-xl space-y-1" :class="stockData?.conditions?.cond_ma_turn ? 'border-emerald-500/50 bg-emerald-950/20' : 'border-slate-800'">
+            <div class="text-[11px] font-bold" :class="stockData?.conditions?.cond_ma_turn ? 'text-emerald-400' : 'text-slate-400'">3. 이평선정배열</div>
             <div class="text-xs font-black text-white">5/20/60일</div>
-            <div class="text-[9px]" :class="stockData.conditions.cond_ma_turn ? 'text-emerald-400 font-bold' : 'text-slate-500'">{{ stockData.conditions.cond_ma_turn ? '정배열 전환' : '미달성' }}</div>
+            <div class="text-[9px]" :class="stockData?.conditions?.cond_ma_turn ? 'text-emerald-400 font-bold' : 'text-slate-500'">{{ stockData?.conditions?.cond_ma_turn ? '정배열 전환' : '미달성' }}</div>
           </div>
 
-          <div class="bg-slate-950/80 border p-3 rounded-xl space-y-1" :class="stockData.conditions.cond_volume ? 'border-emerald-500/50 bg-emerald-950/20' : 'border-slate-800'">
-            <div class="text-[11px] font-bold" :class="stockData.conditions.cond_volume ? 'text-emerald-400' : 'text-slate-400'">4. 거래량수급</div>
-            <div class="text-xs font-black text-white">{{ stockData.volumeRatio !== null ? stockData.volumeRatio + '%' : 'N/A' }}</div>
-            <div class="text-[9px]" :class="stockData.conditions.cond_volume ? 'text-emerald-400 font-bold' : 'text-slate-500'">{{ stockData.conditions.cond_volume ? '120% 급증' : '미달성' }}</div>
+          <div class="bg-slate-950/80 border p-3 rounded-xl space-y-1" :class="stockData?.conditions?.cond_volume ? 'border-emerald-500/50 bg-emerald-950/20' : 'border-slate-800'">
+            <div class="text-[11px] font-bold" :class="stockData?.conditions?.cond_volume ? 'text-emerald-400' : 'text-slate-400'">4. 거래량수급</div>
+            <div class="text-xs font-black text-white">{{ stockData?.volumeRatio !== null && stockData?.volumeRatio !== undefined ? stockData.volumeRatio + '%' : 'N/A' }}</div>
+            <div class="text-[9px]" :class="stockData?.conditions?.cond_volume ? 'text-emerald-400 font-bold' : 'text-slate-500'">{{ stockData?.conditions?.cond_volume ? '120% 급증' : '미달성' }}</div>
           </div>
 
-          <div class="bg-slate-950/80 border p-3 rounded-xl space-y-1" :class="stockData.conditions.cond_macd ? 'border-emerald-500/50 bg-emerald-950/20' : 'border-slate-800'">
-            <div class="text-[11px] font-bold" :class="stockData.conditions.cond_macd ? 'text-emerald-400' : 'text-slate-400'">5. MACD반전</div>
-            <div class="text-xs font-black text-white">{{ stockData.macdHist !== null ? stockData.macdHist : 'N/A' }}</div>
-            <div class="text-[9px]" :class="stockData.conditions.cond_macd ? 'text-emerald-400 font-bold' : 'text-slate-500'">{{ stockData.conditions.cond_macd ? '오실레이터 양전' : '미달성' }}</div>
+          <div class="bg-slate-950/80 border p-3 rounded-xl space-y-1" :class="stockData?.conditions?.cond_macd ? 'border-emerald-500/50 bg-emerald-950/20' : 'border-slate-800'">
+            <div class="text-[11px] font-bold" :class="stockData?.conditions?.cond_macd ? 'text-emerald-400' : 'text-slate-400'">5. MACD반전</div>
+            <div class="text-xs font-black text-white">{{ stockData?.macdHist !== null && stockData?.macdHist !== undefined ? stockData.macdHist : 'N/A' }}</div>
+            <div class="text-[9px]" :class="stockData?.conditions?.cond_macd ? 'text-emerald-400 font-bold' : 'text-slate-500'">{{ stockData?.conditions?.cond_macd ? '오실레이터 양전' : '미달성' }}</div>
           </div>
 
-          <div class="bg-slate-950/80 border p-3 rounded-xl space-y-1" :class="stockData.conditions.cond_rsi ? 'border-emerald-500/50 bg-emerald-950/20' : 'border-slate-800'">
-            <div class="text-[11px] font-bold" :class="stockData.conditions.cond_rsi ? 'text-emerald-400' : 'text-slate-400'">6. RSI탈출</div>
-            <div class="text-xs font-black text-white">{{ stockData.rsi !== null ? stockData.rsi : 'N/A' }}</div>
-            <div class="text-[9px]" :class="stockData.conditions.cond_rsi ? 'text-emerald-400 font-bold' : 'text-slate-500'">{{ stockData.conditions.cond_rsi ? '35 이하 반등' : '미달성' }}</div>
+          <div class="bg-slate-950/80 border p-3 rounded-xl space-y-1" :class="stockData?.conditions?.cond_rsi ? 'border-emerald-500/50 bg-emerald-950/20' : 'border-slate-800'">
+            <div class="text-[11px] font-bold" :class="stockData?.conditions?.cond_rsi ? 'text-emerald-400' : 'text-slate-400'">6. RSI탈출</div>
+            <div class="text-xs font-black text-white">{{ stockData?.rsi !== null && stockData?.rsi !== undefined ? stockData.rsi : 'N/A' }}</div>
+            <div class="text-[9px]" :class="stockData?.conditions?.cond_rsi ? 'text-emerald-400 font-bold' : 'text-slate-500'">{{ stockData?.conditions?.cond_rsi ? '35 이하 반등' : '미달성' }}</div>
           </div>
 
-          <div class="bg-slate-950/80 border p-3 rounded-xl space-y-1" :class="stockData.conditions.cond_divergence ? 'border-emerald-500/50 bg-emerald-950/20' : 'border-slate-800'">
-            <div class="text-[11px] font-bold" :class="stockData.conditions.cond_divergence ? 'text-emerald-400' : 'text-slate-400'">7. 다이버전스</div>
+          <div class="bg-slate-950/80 border p-3 rounded-xl space-y-1" :class="stockData?.conditions?.cond_divergence ? 'border-emerald-500/50 bg-emerald-950/20' : 'border-slate-800'">
+            <div class="text-[11px] font-bold" :class="stockData?.conditions?.cond_divergence ? 'text-emerald-400' : 'text-slate-400'">7. 다이버전스</div>
             <div class="text-xs font-black text-white">강세 반전</div>
-            <div class="text-[9px]" :class="stockData.conditions.cond_divergence ? 'text-emerald-400 font-bold' : 'text-slate-500'">{{ stockData.conditions.cond_divergence ? '다이버전스 포착' : '미달성' }}</div>
+            <div class="text-[9px]" :class="stockData?.conditions?.cond_divergence ? 'text-emerald-400 font-bold' : 'text-slate-500'">{{ stockData?.conditions?.cond_divergence ? '다이버전스 포착' : '미달성' }}</div>
           </div>
 
-          <div class="bg-slate-950/80 border p-3 rounded-xl space-y-1" :class="stockData.conditions.cond_short_signal ? 'border-emerald-500/50 bg-emerald-950/20' : 'border-slate-800'">
-            <div class="text-[11px] font-bold" :class="stockData.conditions.cond_short_signal ? 'text-emerald-400' : 'text-slate-400'">8. 공매도수급</div>
-            <div class="text-xs font-black text-white">{{ stockData.shortSignal?.label || 'N/A' }}</div>
-            <div class="text-[9px]" :class="stockData.conditions.cond_short_signal ? 'text-emerald-400 font-bold' : 'text-slate-500'">{{ stockData.conditions.cond_short_signal ? '수급 호재' : '미달성' }}</div>
+          <div class="bg-slate-950/80 border p-3 rounded-xl space-y-1" :class="stockData?.conditions?.cond_short_signal ? 'border-emerald-500/50 bg-emerald-950/20' : 'border-slate-800'">
+            <div class="text-[11px] font-bold" :class="stockData?.conditions?.cond_short_signal ? 'text-emerald-400' : 'text-slate-400'">8. 공매도수급</div>
+            <div class="text-xs font-black text-white">{{ stockData?.shortSignal?.label || 'N/A' }}</div>
+            <div class="text-[9px]" :class="stockData?.conditions?.cond_short_signal ? 'text-emerald-400 font-bold' : 'text-slate-500'">{{ stockData?.conditions?.cond_short_signal ? '수급 호재' : '미달성' }}</div>
           </div>
         </div>
       </div>
@@ -281,13 +281,49 @@
         </div>
       </div>
 
+      <!-- Technical Buy Report Renderer (Matching buy sample format) -->
+      <div v-if="displayReportText" class="bg-slate-900/90 border border-purple-500/50 rounded-2xl p-6 shadow-2xl space-y-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
+          <div>
+            <span class="px-2.5 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/40 text-xs font-bold">
+              <i class="fas fa-file-alt mr-1"></i> {{ stockData.name }} 기술적 매수 진단 보고서 양식
+            </span>
+            <h3 class="text-lg font-black text-white mt-1">
+              📊 {{ stockData.name }} 기술적 정밀 진단 보고서
+            </h3>
+          </div>
+          <div class="flex items-center gap-2">
+            <button 
+              @click="copyReport" 
+              class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
+            >
+              <i class="fas" :class="isCopied ? 'fa-check text-emerald-400' : 'fa-copy'"></i>
+              <span>{{ isCopied ? '복사 완료!' : '마크다운 보고서 복사' }}</span>
+            </button>
+            <button 
+              @click="downloadReport" 
+              class="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-lg shadow-purple-500/20 active:scale-95"
+            >
+              <i class="fas fa-download"></i>
+              <span>.md 보고서 다운로드</span>
+            </button>
+          </div>
+        </div>
+
+        <div 
+          v-if="renderedReportHtml"
+          class="markdown-body bg-slate-950/90 border border-slate-800/80 p-6 rounded-xl text-xs text-slate-200 overflow-x-auto leading-relaxed space-y-4"
+          v-html="renderedReportHtml"
+        ></div>
+      </div>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { useStockAnalysis, type CalculatedAnalysisResult } from '~/composables/useStockAnalysis';
+import { ref, computed, onMounted } from 'vue';
+import { marked } from 'marked';
+import { useStockAnalysis, generateBuyFormatReport, type CalculatedAnalysisResult } from '~/composables/useStockAnalysis';
 
 const props = defineProps<{
   shcode: string;
@@ -297,17 +333,72 @@ const isLoading = ref(true);
 const errorMessage = ref<string | null>(null);
 const stockData = ref<any>(null);
 const aiAnalysis = ref<CalculatedAnalysisResult | null>(null);
+const isCopied = ref(false);
 
 const stockDetailStore = useStockDetailStore();
 const { analyzeStockWithClaude, analysisError } = useStockAnalysis();
 
+const savedReportText = ref<string>('');
+
+const displayReportText = computed(() => {
+  if (savedReportText.value) return savedReportText.value;
+  if (!stockData.value) return '';
+  return generateBuyFormatReport(stockData.value, aiAnalysis.value);
+});
+
+const renderedReportHtml = computed(() => {
+  if (!displayReportText.value) return '';
+  try {
+    return marked.parse(displayReportText.value);
+  } catch (e) {
+    return displayReportText.value;
+  }
+});
+
+function copyReport() {
+  if (!displayReportText.value) return;
+  navigator.clipboard.writeText(displayReportText.value);
+  isCopied.value = true;
+  setTimeout(() => { isCopied.value = false; }, 2000);
+}
+
+function downloadReport() {
+  if (!displayReportText.value || !stockData.value) return;
+  const filename = `${stockData.value.name}_종목코드_${stockData.value.shcode}_기술적진단보고서.md`;
+  const blob = new Blob([displayReportText.value], { type: 'text/markdown;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+async function persistReportToServer(reportText: string) {
+  if (!stockData.value || !reportText) return;
+  try {
+    await $fetch('/api/report/save', {
+      method: 'POST',
+      body: {
+        shcode: stockData.value.shcode,
+        name: stockData.value.name,
+        report: reportText
+      }
+    });
+  } catch (e) {
+    console.warn('Report file auto-save to server failed:', e);
+  }
+}
+
 onMounted(async () => {
   stockDetailStore.initFromStorage();
   
-  // 1. LocalStorage 캐시 데이터가 있으면 새로고침 즉시 화면 표기
+  // 1. LocalStorage 캐시 데이터 및 저장된 AI 보고서가 있으면 새로고침 즉시 화면 표기
   const cached = stockDetailStore.getStockCache(props.shcode);
   if (cached) {
     stockData.value = cached;
+    if (cached.generatedReport) {
+      savedReportText.value = cached.generatedReport;
+    }
     isLoading.value = false;
   }
 
@@ -331,6 +422,14 @@ async function loadStockDetail() {
       const result = await analyzeStockWithClaude(updated as any);
       if (result) {
         aiAnalysis.value = result;
+        const freshReport = generateBuyFormatReport(updated, result);
+        savedReportText.value = freshReport;
+        
+        // Pinia Store 및 LocalStorage에 1달 보존 저장
+        stockDetailStore.saveAiReport(props.shcode, freshReport);
+
+        // 백엔드 report/ 폴더에 md 및 json 파일로 영구 저장
+        await persistReportToServer(freshReport);
       } else if (analysisError.value) {
         errorMessage.value = `[Claude AI 연동 경고]: ${analysisError.value}`;
       }
