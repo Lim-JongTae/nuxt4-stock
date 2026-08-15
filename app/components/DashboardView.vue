@@ -96,9 +96,18 @@
             <span>오늘의 시장 종합 분석 및 대응 전략</span>
           </h3>
           <div class="flex items-center gap-2">
-            <span class="text-[11px] text-slate-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 font-mono">
-              시세 갱신: {{ screenerStore.lastUpdated || '실시간' }}
+            <span class="text-[11px] text-slate-300 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 font-mono flex items-center gap-1.5">
+              <i class="fas fa-clock text-indigo-400"></i>
+              <span>시세 갱신: {{ screenerStore.lastUpdated || '실시간' }}</span>
             </span>
+            <button 
+              @click="screenerStore.refreshScreener()" 
+              :disabled="screenerStore.isRefreshing"
+              class="px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+            >
+              <i class="fas" :class="screenerStore.isRefreshing ? 'fa-spinner fa-spin text-amber-400' : 'fa-sync-alt'"></i>
+              <span>{{ screenerStore.isRefreshing ? '갱신 중...' : '시세 갱신' }}</span>
+            </button>
           </div>
         </div>
 

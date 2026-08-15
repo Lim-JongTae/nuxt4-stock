@@ -577,11 +577,11 @@ export async function fetchLSSectorData(token: string): Promise<{
   bottomSectors: Array<{ code: string; name: string; rate: number }>;
 }> {
   const fallbackTop = [
-    { code: '001', name: '전기전자/AI', rate: 2.45 },
-    { code: '009', name: '전력인프라/기계', rate: 1.85 },
-    { code: '015', name: '바이오/제약', rate: 1.42 },
-    { code: '003', name: '화학/소재', rate: 0.98 },
-    { code: '018', name: '자동차/운수장비', rate: 0.75 }
+    { code: '001', name: '전기/전자', rate: 2.45 },
+    { code: '009', name: '기계', rate: 1.85 },
+    { code: '015', name: '의약품', rate: 1.42 },
+    { code: '003', name: '화학', rate: 0.98 },
+    { code: '018', name: '운수장비', rate: 0.75 }
   ];
 
   const fallbackBottom = [
@@ -623,19 +623,40 @@ export async function fetchLSSectorData(token: string): Promise<{
         const data = await res.json();
         const rows = data.t8424OutBlock || data.t8424OutBlock1;
         if (Array.isArray(rows) && rows.length > 0) {
-          const parsed = rows
-            .map((r: any) => {
-              const name = String(r.hname || r.upname || '').trim();
-              const code = String(r.upcode || r.code || '').trim();
-              const rawRate = parseFloat(String(r.rate || r.diff || 0));
-              return {
-                code,
-                name,
-                rate: isNaN(rawRate) ? 0 : Math.round(rawRate * 100) / 100
-              };
-            })
-            .filter(s => s.name && s.name !== '종합' && s.name !== '코스피' && s.name !== '코스닥');
+          const sanitizeSectorName = (name: string): string | null => {
+            if (!name) return null;
+            const clean = name.replace(/\s+/g, '');
+            if (['종합', '코스피', '코스닥', '대형', '중형', '소형', '제조', 'KOSPI', 'KOSDAQ', '지수', '시장'].some(kw => clean.includes(kw))) {
+              return null;
+            }
+            if (clean.includes('전기') || clean.includes('전자')) return '전기/전자';
+            if (clean.includes('의약') || clean.includes('제약') || clean.includes('바이오')) return '의약품';
+            if (clean.includes('철강') || clean.includes('금속')) return '철강/금속';
+            if (clean.includes('종이') || clean.includes('목재')) return '종이/목재';
+            if (clean.includes('운수') || clean.includes('장비')) return '운수장비';
+            if (clean.includes('건설')) return '건설업';
+            if (clean.includes('유통')) return '유통업';
+            if (clean.includes('서비스')) return '서비스업';
+            if (clean.includes('기계')) return '기계';
+            if (clean.includes('화학')) return '화학';
+            return clean;
+          };
 
+          const parsedMap = new Map<string, { code: string; name: string; rate: number }>();
+          rows.forEach((r: any) => {
+            const rawName = String(r.hname || r.upname || '').trim();
+            const name = sanitizeSectorName(rawName);
+            if (name) {
+              const code = String(r.upcode || r.code || '').trim();
+              const rawRate = parseFloat(String(r.rate || r.diff || r.chgrate || 0));
+              const rate = isNaN(rawRate) ? 0 : Math.round(rawRate * 100) / 100;
+              if (!parsedMap.has(name) || parsedMap.get(name)!.rate === 0) {
+                parsedMap.set(name, { code, name, rate });
+              }
+            }
+          });
+
+          const parsed = Array.from(parsedMap.values());
           const topSectors = [...parsed].sort((a, b) => b.rate - a.rate).slice(0, 5);
           const bottomSectors = [...parsed].sort((a, b) => a.rate - b.rate).slice(0, 5);
 

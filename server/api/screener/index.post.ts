@@ -213,6 +213,51 @@ export default defineEventHandler(async (event) => {
     oldData = newBatch.map(item => ({ ...item, createdAt: `${localTime} (이전 분석)` }));
   }
 
+  // 3. 업종별 동적 상승/하락률 계산 (Macro 더미 업종 필터링 및 수집 종목 업종 연동)
+  const isMacroOrScale = (name: string): boolean => {
+    if (!name) return true;
+    const clean = name.replace(/\s+/g, '');
+    return ['대형', '중형', '소형', '종합', '코스피', '코스닥', '제조', 'KOSPI', 'KOSDAQ', '지수', '시장'].some(kw => clean.includes(kw));
+  };
+
+  const normalizeSectorName = (ind: string): string => {
+    const clean = ind.trim();
+    if (clean.includes('반도체') || clean.includes('전기') || clean.includes('전자') || clean.includes('IT')) return '전기/전자';
+    if (clean.includes('전력') || clean.includes('기계') || clean.includes('인프라')) return '기계';
+    if (clean.includes('바이오') || clean.includes('제약') || clean.includes('의료')) return '의약품';
+    if (clean.includes('화학') || clean.includes('소재') || clean.includes('배터리') || clean.includes('2차전지')) return '화학';
+    if (clean.includes('자동차') || clean.includes('운수') || clean.includes('장비')) return '운수장비';
+    if (clean.includes('건설')) return '건설업';
+    if (clean.includes('유통') || clean.includes('소비재')) return '유통업';
+    if (clean.includes('철강') || clean.includes('금속')) return '철강/금속';
+    if (clean.includes('종이') || clean.includes('목재')) return '종이/목재';
+    return clean;
+  };
+
+  let topSectors = (sectorData.topSectors || []).filter(s => s.name && !isMacroOrScale(s.name));
+  let bottomSectors = (sectorData.bottomSectors || []).filter(s => s.name && !isMacroOrScale(s.name));
+
+  if ((topSectors.length < 5 || bottomSectors.length < 5) && newBatch.length > 0) {
+    const sectorMap = new Map<string, { totalRate: number; count: number }>();
+    newBatch.forEach(s => {
+      const ind = normalizeSectorName(s.industry || '기타');
+      if (!sectorMap.has(ind)) sectorMap.set(ind, { totalRate: 0, count: 0 });
+      const entry = sectorMap.get(ind)!;
+      const r = typeof s.changeRate === 'number' ? s.changeRate : Math.round(((s.score - 50) / 10) * 100) / 100;
+      entry.totalRate += r;
+      entry.count += 1;
+    });
+
+    const parsedSectors = Array.from(sectorMap.entries()).map(([name, val], idx) => ({
+      code: String(idx + 1).padStart(3, '0'),
+      name,
+      rate: Math.round((val.totalRate / val.count) * 100) / 100
+    }));
+
+    topSectors = [...parsedSectors].sort((a, b) => b.rate - a.rate).slice(0, 5);
+    bottomSectors = [...parsedSectors].sort((a, b) => a.rate - b.rate).slice(0, 5);
+  }
+
   return {
     success: true,
     timestamp: localTime,
@@ -223,7 +268,7 @@ export default defineEventHandler(async (event) => {
     oldData,
     newData: newBatch,
     marketBasis,
-    topSectors: sectorData.topSectors,
-    bottomSectors: sectorData.bottomSectors
+    topSectors,
+    bottomSectors
   };
 });
