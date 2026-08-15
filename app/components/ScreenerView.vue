@@ -342,15 +342,15 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import { useScreenerStore, type StockItem } from '~/stores/useScreenerStore';
 
 const screenerStore = useScreenerStore();
 
 onMounted(async () => {
   screenerStore.initFromStorage();
-  if (screenerStore.newData.length === 0) {
-    await screenerStore.refreshScreener();
-  }
+  // 항상 또는 데이터가 없거나 갱신 필요 시 LS증권 API 실시간 시세 갱신
+  await screenerStore.refreshScreener();
 });
 
 function getPriceDelta(newItem: StockItem) {

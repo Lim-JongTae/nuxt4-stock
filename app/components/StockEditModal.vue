@@ -117,7 +117,7 @@
             <button 
               type="submit" 
               :disabled="isSubmitting"
-              class="px-5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold shadow-lg flex items-center gap-1.5 disabled:opacity-50"
+              class="px-5 py-2 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold shadow-lg flex items-center gap-1.5 disabled:opacity-50"
             >
               <i class="fas" :class="isSubmitting ? 'fa-spinner fa-spin' : 'fa-check'"></i>
               <span>{{ isSubmitting ? '저장 중...' : 'SQLite DB 저장' }}</span>
@@ -131,6 +131,8 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
+import { useScreenerStore } from '@/stores/useScreenerStore';
+import { usePortfolioStore } from '@/stores/usePortfolioStore';
 
 export interface StockItemForm {
   shcode: string;
@@ -150,6 +152,9 @@ const emit = defineEmits<{
   (e: 'close'): void;
   (e: 'saved'): void;
 }>();
+
+const screenerStore = useScreenerStore();
+const portfolioStore = usePortfolioStore();
 
 const isEditMode = ref(false);
 const isSubmitting = ref(false);
@@ -205,8 +210,13 @@ async function submitForm() {
         body: form.value
       });
     }
+    
     emit('saved');
     closeModal();
+
+    // 종목 추가/편집 후 스크리너 및 포트폴리오 실시간 8대 지표 데이터 즉시 갱신
+    portfolioStore.fetchHoldings();
+    screenerStore.refreshScreener();
   } catch (err: any) {
     console.error('Submit stock form error:', err);
     errorMsg.value = err.statusMessage || err.message || 'SQLite DB 저장 중 오류가 발생했습니다.';
@@ -226,6 +236,10 @@ async function deleteStock() {
     });
     emit('saved');
     closeModal();
+
+    // 종목 삭제 후 스크리너 및 포트폴리오 갱신
+    portfolioStore.fetchHoldings();
+    screenerStore.refreshScreener();
   } catch (err: any) {
     console.error('Delete stock error:', err);
     errorMsg.value = err.statusMessage || err.message || '종목 삭제 실패';
