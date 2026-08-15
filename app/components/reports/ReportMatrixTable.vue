@@ -1,125 +1,138 @@
 <template>
-  <UCard variant="subtle" class="bg-slate-900/80 border-slate-800 rounded-2xl shadow-xl space-y-4">
-    <template #header>
-      <div class="flex items-center justify-between">
-        <h3 class="text-base font-bold text-white flex items-center gap-2">
-          <i class="fas fa-table text-cyan-400"></i>
-          <span>📊 전 종목 8대 기술적 지표 & 퀀트 배점 매트릭스 (Nuxt UI UTable)</span>
-        </h3>
-        <UBadge color="primary" variant="subtle" class="text-xs">
-          Store 중앙집중 관리
-        </UBadge>
-      </div>
-    </template>
+  <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+      <h3 class="text-base font-bold text-white flex items-center gap-2">
+        <i class="fas fa-table text-cyan-400"></i>
+        <span>📊 전 종목 8대 기술적 지표 & 퀀트 배점 매트릭스</span>
+      </h3>
+      <span class="px-2.5 py-0.5 rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/20 text-xs font-bold">
+        Store 중앙집중 관리
+      </span>
+    </div>
 
     <div class="overflow-x-auto border border-slate-800 rounded-xl bg-slate-950/90 shadow-md">
-      <UTable 
-        :columns="(columns as any)" 
-        :data="(formattedRows as any)"
-        class="w-full text-xs text-left"
-      >
-        <!-- Custom Industry Cell -->
-        <template #industry-cell="{ row }: any">
-          <UBadge color="primary" variant="subtle" size="xs" class="font-bold">
-            {{ row.industry }}
-          </UBadge>
-        </template>
-
-        <!-- Custom Shcode Cell -->
-        <template #shcode-cell="{ row }: any">
-          <span class="font-mono text-slate-400">{{ row.shcode }}</span>
-        </template>
-
-        <!-- Custom Name Cell -->
-        <template #name-cell="{ row }: any">
-          <button 
-            @click="$emit('select-stock', row.original)"
-            class="font-bold text-white hover:text-purple-300 hover:underline cursor-pointer text-left"
+      <table class="w-full text-xs text-left text-slate-300">
+        <thead class="bg-slate-900/90 text-slate-400 font-semibold border-b border-slate-800 uppercase text-[11px]">
+          <tr>
+            <th class="px-3 py-3">업종</th>
+            <th class="px-3 py-3">종목코드</th>
+            <th class="px-3 py-3">종목명</th>
+            <th class="px-3 py-3">현재가</th>
+            <th class="px-3 py-3">심리선(12일)</th>
+            <th class="px-3 py-3">볼린저 하단</th>
+            <th class="px-3 py-3">이평선 5/20/60</th>
+            <th class="px-3 py-3">거래량비율</th>
+            <th class="px-3 py-3">MACD</th>
+            <th class="px-3 py-3">RSI(14)</th>
+            <th class="px-3 py-3">수급 상태</th>
+            <th class="px-3 py-3 text-center">퀀트 스코어</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800/60">
+          <tr 
+            v-for="item in stockList" 
+            :key="item.shcode"
+            :class="[
+              item.shcode === activeShcode ? 'bg-purple-950/40 border-l-4 border-l-purple-500' : 'hover:bg-slate-900/80',
+              item.score >= 85 ? 'bg-emerald-950/20' : ''
+            ]"
+            class="transition-all"
           >
-            {{ row.name }}
-          </button>
-        </template>
+            <!-- 업종 -->
+            <td class="px-3 py-3">
+              <span class="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20 font-semibold text-[10px]">
+                {{ item.industry || '기타' }}
+              </span>
+            </td>
 
-        <!-- Custom ClosePrice Cell -->
-        <template #closePrice-cell="{ row }: any">
-          <span class="font-bold font-mono text-slate-100">
-            {{ Number(row.closePrice).toLocaleString() }}원
-          </span>
-        </template>
+            <!-- 종목코드 -->
+            <td class="px-3 py-3 font-mono text-slate-400">
+              {{ item.shcode }}
+            </td>
 
-        <!-- Custom Psy Cell -->
-        <template #psy-cell="{ row }: any">
-          <span class="font-mono" :class="row.original?.psy && row.original.psy <= 25 ? 'text-emerald-400 font-bold' : 'text-slate-300'">
-            {{ row.original?.psy ?? '-' }}%
-          </span>
-        </template>
+            <!-- 종목명 -->
+            <td class="px-3 py-3 font-bold text-white">
+              <button 
+                @click="$emit('select-stock', item)"
+                class="font-bold text-indigo-300 hover:text-white hover:underline cursor-pointer text-left flex items-center gap-1 group"
+              >
+                <span>{{ item.name }}</span>
+                <i class="fas fa-arrow-right text-[9px] text-indigo-400 opacity-60 group-hover:opacity-100"></i>
+              </button>
+            </td>
 
-        <!-- Custom BbLower Cell -->
-        <template #bbLower-cell="{ row }: any">
-          <span class="font-mono text-slate-300">
-            {{ row.original?.bbLower ? Number(row.original.bbLower).toLocaleString() + '원' : '-' }}
-          </span>
-        </template>
+            <!-- 현재가 -->
+            <td class="px-3 py-3 font-bold font-mono text-slate-100">
+              {{ Number(item.closePrice).toLocaleString() }}원
+            </td>
 
-        <!-- Custom MaSignal Cell -->
-        <template #maSignal-cell="{ row }: any">
-          <span class="font-mono" :class="row.original?.ma5 && row.original?.ma20 && row.original.ma5 >= row.original.ma20 ? 'text-emerald-400 font-bold' : 'text-sky-400'">
-            {{ row.original?.ma5 && row.original?.ma20 && row.original.ma5 >= row.original.ma20 ? '🟢 우상향' : '☁️ 보합' }}
-          </span>
-        </template>
+            <!-- 심리선 -->
+            <td class="px-3 py-3 font-mono" :class="typeof item.psy === 'number' && item.psy <= 25 ? 'text-emerald-400 font-bold' : 'text-slate-300'">
+              {{ typeof item.psy === 'number' ? item.psy + '%' : '-' }}
+            </td>
 
-        <!-- Custom VolumeRatio Cell -->
-        <template #volumeRatio-cell="{ row }: any">
-          <span class="font-mono" :class="row.original?.volumeRatio && row.original.volumeRatio >= 120 ? 'text-rose-400 font-bold' : 'text-slate-300'">
-            {{ row.original?.volumeRatio ?? '-' }}%
-          </span>
-        </template>
+            <!-- 볼린저 하단 -->
+            <td class="px-3 py-3 font-mono text-slate-300">
+              {{ item.bbLower ? Number(item.bbLower).toLocaleString() + '원' : '-' }}
+            </td>
 
-        <!-- Custom MacdHist Cell -->
-        <template #macdHist-cell="{ row }: any">
-          <span class="font-mono" :class="row.original?.macdHist && row.original.macdHist > 0 ? 'text-rose-400 font-bold' : 'text-blue-400'">
-            {{ row.original?.macdHist ?? '양전' }}
-          </span>
-        </template>
+            <!-- 이평선 -->
+            <td class="px-3 py-3 font-mono text-emerald-400 font-semibold">
+              <span v-if="item.ma5 && item.ma20 && item.ma5 >= item.ma20">🟢 우상향 지지</span>
+              <span v-else class="text-slate-400 font-normal">☁️ 보합</span>
+            </td>
 
-        <!-- Custom Rsi Cell -->
-        <template #rsi-cell="{ row }: any">
-          <span class="font-mono" :class="row.original?.rsi && row.original.rsi <= 30 ? 'text-emerald-400 font-bold' : 'text-slate-300'">
-            {{ row.original?.rsi ?? '-' }}
-          </span>
-        </template>
+            <!-- 거래량비율 -->
+            <td class="px-3 py-3 font-mono" :class="typeof item.volumeRatio === 'number' && item.volumeRatio >= 120 ? 'text-amber-400 font-extrabold' : 'text-slate-300'">
+              {{ typeof item.volumeRatio === 'number' ? item.volumeRatio + '%' : '-' }}
+            </td>
 
-        <!-- Custom ShortSellingStatus Cell -->
-        <template #shortSellingStatus-cell="{ row }: any">
-          <span class="font-bold text-[11px]" :class="row.original?.shortSellingStatus?.includes('COVERING') ? 'text-rose-400' : 'text-cyan-300'">
-            {{ row.original?.shortSellingStatus || '수급 안정' }}
-          </span>
-        </template>
+            <!-- MACD -->
+            <td class="px-3 py-3 font-mono" :class="typeof item.macdHist === 'number' && item.macdHist > 0 ? 'text-pink-400 font-bold' : 'text-blue-400'">
+              {{ typeof item.macdHist === 'number' ? (item.macdHist > 0 ? '+' + item.macdHist : item.macdHist) : '-' }}
+            </td>
 
-        <!-- Custom Score Cell -->
-        <template #score-cell="{ row }: any">
-          <div class="text-center">
-            <UBadge 
-              :color="row.score >= 85 ? 'emerald' : 'neutral'" 
-              variant="solid" 
-              size="md" 
-              class="font-extrabold cursor-pointer"
-              @click="$emit('select-stock', row.original)"
-            >
-              {{ row.score }}점
-            </UBadge>
-          </div>
-        </template>
-      </UTable>
+            <!-- RSI -->
+            <td class="px-3 py-3 font-mono" :class="typeof item.rsi === 'number' && item.rsi <= 30 ? 'text-emerald-400 font-bold' : 'text-slate-300'">
+              {{ typeof item.rsi === 'number' ? item.rsi : '-' }}
+            </td>
+
+            <!-- 수급 상태 -->
+            <td class="px-3 py-3 font-bold text-[11px]">
+              <span 
+                class="px-2 py-0.5 rounded text-[10px] font-semibold"
+                :class="{
+                  'bg-red-500/20 text-red-400 border border-red-500/40': item.shortSellingStatus === '숏커버링(환매수) 유력',
+                  'bg-blue-500/20 text-blue-400 border border-blue-500/40': item.shortSellingStatus === '신규 공매도 유입',
+                  'bg-pink-500/20 text-pink-400 border border-pink-500/40': item.shortSellingStatus === '매수세가 공매도 흡수 중',
+                  'bg-slate-900 text-slate-300 border border-slate-700': !['숏커버링(환매수) 유력', '신규 공매도 유입', '매수세가 공매도 흡수 중'].includes(item.shortSellingStatus || '')
+                }"
+              >
+                {{ item.shortSellingStatus || '수급 안정' }}
+              </span>
+            </td>
+
+            <!-- 퀀트 스코어 -->
+            <td class="px-3 py-3 text-center">
+              <button 
+                @click="$emit('select-stock', item)"
+                class="px-2.5 py-1 rounded-lg text-[10px] font-extrabold cursor-pointer transition-all active:scale-95"
+                :class="item.score >= 85 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40' : 'bg-slate-800 text-slate-300 border border-slate-700'"
+              >
+                {{ item.score }}점
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
-  </UCard>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
 import type { StockItem } from '~/stores/useScreenerStore';
 
-const props = defineProps<{
+defineProps<{
   stockList: StockItem[];
   activeShcode: string;
 }>();
@@ -127,37 +140,4 @@ const props = defineProps<{
 defineEmits<{
   (e: 'select-stock', item: StockItem): void;
 }>();
-
-const columns = [
-  { key: 'industry', label: '업종' },
-  { key: 'shcode', label: '종목코드' },
-  { key: 'name', label: '종목명' },
-  { key: 'closePrice', label: '현재가' },
-  { key: 'psy', label: '심리선(12일)' },
-  { key: 'bbLower', label: '볼린저 하단' },
-  { key: 'maSignal', label: '이평선 5/20/60' },
-  { key: 'volumeRatio', label: '거래량비율' },
-  { key: 'macdHist', label: 'MACD' },
-  { key: 'rsi', label: 'RSI(14)' },
-  { key: 'shortSellingStatus', label: '수급 상태' },
-  { key: 'score', label: '퀀트 스코어' }
-];
-
-const formattedRows = computed(() => {
-  return props.stockList.map(item => ({
-    industry: item.industry || '기타',
-    shcode: item.shcode,
-    name: item.name,
-    closePrice: item.closePrice,
-    psy: item.psy,
-    bbLower: item.bbLower,
-    maSignal: item.ma5 && item.ma20 && item.ma5 >= item.ma20 ? '우상향' : '보합',
-    volumeRatio: item.volumeRatio,
-    macdHist: item.macdHist,
-    rsi: item.rsi,
-    shortSellingStatus: item.shortSellingStatus || '수급 안정',
-    score: item.score,
-    original: item
-  }));
-});
 </script>

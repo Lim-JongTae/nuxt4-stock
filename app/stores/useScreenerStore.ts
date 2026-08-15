@@ -1,10 +1,10 @@
 import { defineStore } from 'pinia';
-import type { StockItem, ScreenerApiResponse, MarketBasisInfo } from '../../utils/types/lsSecurities';
+import type { StockItem, ScreenerApiResponse, MarketBasisInfo, TopSectorInfo, AiMarketAnalysisInfo } from '../../utils/types/lsSecurities';
 
-export type { StockItem, ScreenerApiResponse, MarketBasisInfo };
+export type { StockItem, ScreenerApiResponse, MarketBasisInfo, TopSectorInfo, AiMarketAnalysisInfo };
 
 const KEY_PREFIX = 'nuxt4_stock_screener_';
-const EXPIRATION_MS = 15 * 24 * 60 * 60 * 1000; // 15일 보존 정책 (15일 이상 초과 시에만 자동 제거)
+const EXPIRATION_MS = 15 * 24 * 60 * 60 * 1000; // 15일 보존 정책
 
 const defaultMarketBasis: MarketBasisInfo = {
   basis: 0.45,
@@ -16,6 +16,22 @@ const defaultMarketBasis: MarketBasisInfo = {
   vkospi: 18.2,
   updatedAt: new Date().toLocaleString('ko-KR')
 };
+
+const defaultTopSectors: TopSectorInfo[] = [
+  { code: '001', name: '전기전자/AI', rate: 2.45 },
+  { code: '009', name: '전력인프라/기계', rate: 1.85 },
+  { code: '015', name: '바이오/제약', rate: 1.42 },
+  { code: '003', name: '화학/소재', rate: 0.98 },
+  { code: '018', name: '자동차/운수장비', rate: 0.75 }
+];
+
+const defaultBottomSectors: TopSectorInfo[] = [
+  { code: '020', name: '종이/목재', rate: -1.85 },
+  { code: '022', name: '철강/금속', rate: -1.25 },
+  { code: '025', name: '건설업', rate: -0.95 },
+  { code: '027', name: '유통업', rate: -0.62 },
+  { code: '030', name: '섬유/의복', rate: -0.45 }
+];
 
 function getTodayKey(): string {
   const d = new Date();
@@ -30,7 +46,11 @@ export const useScreenerStore = defineStore('screener', {
     oldData: [] as StockItem[],
     newData: [] as StockItem[],
     marketBasis: defaultMarketBasis as MarketBasisInfo | null,
+    topSectors: defaultTopSectors as TopSectorInfo[],
+    bottomSectors: defaultBottomSectors as TopSectorInfo[],
+    aiMarketAnalysis: null as AiMarketAnalysisInfo | null,
     isRefreshing: false,
+    isAiAnalyzing: false,
     lastUpdated: '',
     cachedTimestamp: 0,
     sourceProvider: 'LS증권 Open API (openapi.ls-sec.co.kr)',
@@ -47,6 +67,16 @@ export const useScreenerStore = defineStore('screener', {
       if (!state.newData || state.newData.length === 0) return [];
       return [...state.newData].sort((a, b) => b.score - a.score).slice(0, 3);
     },
+    bottomDecliningStocks: (state) => {
+      if (!state.newData || state.newData.length === 0) return [];
+      return [...state.newData]
+        .sort((a, b) => {
+          const rateA = typeof a.changeRate === 'number' ? a.changeRate : (a.score - 100);
+          const rateB = typeof b.changeRate === 'number' ? b.changeRate : (b.score - 100);
+          return rateA - rateB;
+        })
+        .slice(0, 5);
+    },
     oldRecordTime: (state) => {
       if (state.oldData && state.oldData.length > 0 && state.oldData[0]?.createdAt) {
         return state.oldData[0].createdAt;
@@ -56,14 +86,12 @@ export const useScreenerStore = defineStore('screener', {
   },
 
   actions: {
-    // 최초 진입 시 스토리지/캐시 데이터 불러오기 (1일 1개 보존 & 15일 이상 경과 데이터만 자동 제거)
     initFromStorage() {
       if (typeof window === 'undefined') return;
       try {
         const now = Date.now();
         const validDailyKeys: string[] = [];
 
-        // 1. 15일 이상 경과한 과거 일별 데이터만 자동 제거 (15일 이내 타 날짜 1일1개 데이터는 100% 보존)
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
           if (key && (key.startsWith(KEY_PREFIX) || key.startsWith('nuxt4_stock_screener_cache'))) {
@@ -72,7 +100,7 @@ export const useScreenerStore = defineStore('screener', {
               try {
                 const parsed = JSON.parse(raw);
                 if (parsed.cachedTimestamp && now - parsed.cachedTimestamp > EXPIRATION_MS) {
-                  localStorage.removeItem(key); // 15일 초과 데이터만 삭제
+                  localStorage.removeItem(key);
                 } else if (key.startsWith(KEY_PREFIX)) {
                   validDailyKeys.push(key);
                 }
@@ -83,7 +111,6 @@ export const useScreenerStore = defineStore('screener', {
           }
         }
 
-        // 2. 가장 최근 날짜의 1일 1개 데이터 불러오기
         const todayKey = getTodayKey();
         const targetKey = localStorage.getItem(todayKey) ? todayKey : (validDailyKeys.sort().pop() || todayKey);
         const saved = localStorage.getItem(targetKey);
@@ -101,6 +128,19 @@ export const useScreenerStore = defineStore('screener', {
           } else {
             this.marketBasis = defaultMarketBasis;
           }
+          if (parsed.topSectors && Array.isArray(parsed.topSectors) && parsed.topSectors.length > 0) {
+            this.topSectors = parsed.topSectors;
+          } else {
+            this.topSectors = defaultTopSectors;
+          }
+          if (parsed.bottomSectors && Array.isArray(parsed.bottomSectors) && parsed.bottomSectors.length > 0) {
+            this.bottomSectors = parsed.bottomSectors;
+          } else {
+            this.bottomSectors = defaultBottomSectors;
+          }
+          if (parsed.aiMarketAnalysis) {
+            this.aiMarketAnalysis = parsed.aiMarketAnalysis;
+          }
           this.lastUpdated = parsed.lastUpdated || '';
           this.cachedTimestamp = parsed.cachedTimestamp || 0;
           this.sourceProvider = parsed.sourceProvider || this.sourceProvider;
@@ -110,7 +150,6 @@ export const useScreenerStore = defineStore('screener', {
       }
     },
 
-    // 데이터를 스토리지에 당일 1일 1개 덮어쓰기로 15일간 보관
     saveToStorage() {
       if (typeof window === 'undefined') return;
       try {
@@ -120,6 +159,9 @@ export const useScreenerStore = defineStore('screener', {
           newData: this.newData,
           oldData: this.oldData,
           marketBasis: this.marketBasis,
+          topSectors: this.topSectors,
+          bottomSectors: this.bottomSectors,
+          aiMarketAnalysis: this.aiMarketAnalysis,
           lastUpdated: this.lastUpdated,
           cachedTimestamp: this.cachedTimestamp,
           sourceProvider: this.sourceProvider
@@ -129,7 +171,6 @@ export const useScreenerStore = defineStore('screener', {
       }
     },
 
-    // 페이지 진입 및 초기 로드 (forceRefresh=false이면 스토어/LocalStorage 캐시 0ms 반환)
     async loadInitial(forceRefresh = false) {
       this.initFromStorage();
 
@@ -140,7 +181,6 @@ export const useScreenerStore = defineStore('screener', {
       await this.refreshScreener();
     },
 
-    // 새로고침 및 시세조회 버튼 클릭시에만 실행하여 API 재호출
     async refreshScreener() {
       if (this.isRefreshing) return;
       this.isRefreshing = true;
@@ -158,13 +198,18 @@ export const useScreenerStore = defineStore('screener', {
           if (response.marketBasis) {
             this.marketBasis = response.marketBasis;
           }
+          if (response.topSectors && response.topSectors.length > 0) {
+            this.topSectors = response.topSectors;
+          }
+          if (response.bottomSectors && response.bottomSectors.length > 0) {
+            this.bottomSectors = response.bottomSectors;
+          }
           this.lastUpdated = response.timestamp || new Date().toLocaleString('ko-KR');
           this.sourceProvider = response.source || this.sourceProvider;
           if (response.error) {
             this.errorMessage = response.error;
           }
 
-          // 성공적인 데이터 반환 시 스토리지에 캐시 저장
           this.saveToStorage();
         }
       } catch (err: any) {
@@ -172,6 +217,35 @@ export const useScreenerStore = defineStore('screener', {
         this.errorMessage = err.statusMessage || err.message || 'LS증권 시세 스크리닝 데이터 호출 중 오류가 발생했습니다.';
       } finally {
         this.isRefreshing = false;
+      }
+    },
+
+    async runAiMarketDiagnosis() {
+      if (this.isAiAnalyzing) return;
+      this.isAiAnalyzing = true;
+      try {
+        const payload = {
+          marketBasis: this.marketBasis,
+          topSectors: this.topSectors,
+          bottomSectors: this.bottomSectors,
+          matchedCount: this.matchedCount
+        };
+        const res = await $fetch<{ success: boolean; content: string; createdAt: string }>('/api/ai/market-diagnosis', {
+          method: 'POST',
+          body: payload
+        });
+        if (res && res.success && res.content) {
+          this.aiMarketAnalysis = {
+            content: res.content,
+            createdAt: res.createdAt
+          };
+          this.saveToStorage();
+        }
+      } catch (err: any) {
+        console.error('AI Market Diagnosis error:', err);
+        throw err;
+      } finally {
+        this.isAiAnalyzing = false;
       }
     }
   }

@@ -1,7 +1,7 @@
 import { db } from '../../db';
 import { screenerHistory, stocks } from '../../db/schema';
 import { desc } from 'drizzle-orm';
-import { loadEnv, getLSToken, fetchLSPrice, fetchLSShortSellTrend, fetchLSMarketBasis } from '../../utils/lsApi';
+import { loadEnv, getLSToken, fetchLSPrice, fetchLSShortSellTrend, fetchLSMarketBasis, fetchLSSectorData } from '../../utils/lsApi';
 import { classifyShortSellSignal, type ShortSellRecord } from '../../utils/shortSellSignal';
 
 export default defineEventHandler(async (event) => {
@@ -11,6 +11,7 @@ export default defineEventHandler(async (event) => {
 
   const { token, error: tokenError } = await getLSToken(appKey, appSecret);
   const marketBasis = await fetchLSMarketBasis(token || '');
+  const sectorData = await fetchLSSectorData(token || '');
 
   // 1. SQLite DB (stocks 테이블)에서 보유종목 + 관심종목 동적 로드
   const dbStocks = await db.select().from(stocks);
@@ -183,6 +184,9 @@ export default defineEventHandler(async (event) => {
       shortSellMetrics: shortSignal.metrics,
       shortAvgPrice: shortSellHistory && shortSellHistory.length > 0 ? shortSellHistory[0]?.shortAvgPrice : undefined,
       shortVolume: shortSellHistory && shortSellHistory.length > 0 ? shortSellHistory[0]?.shortVolume : undefined,
+      changeRate: shortSellHistory && shortSellHistory.length > 0 && typeof shortSellHistory[0]?.changeRate === 'number'
+        ? shortSellHistory[0].changeRate
+        : (shortSignal.metrics?.priceDiffRate ?? undefined),
       score,
       isFullyMatched: is_fully_matched,
       createdAt: localTime
@@ -218,6 +222,8 @@ export default defineEventHandler(async (event) => {
     error: priceFailCount > 0 ? apiCallNote : (tokenError || null),
     oldData,
     newData: newBatch,
-    marketBasis
+    marketBasis,
+    topSectors: sectorData.topSectors,
+    bottomSectors: sectorData.bottomSectors
   };
 });

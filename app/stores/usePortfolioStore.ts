@@ -34,10 +34,14 @@ export const usePortfolioStore = defineStore('portfolio', {
 
   getters: {
     totalPurchaseAmount: (state) => {
-      return state.holdings.reduce((sum, item) => sum + (item.avgPrice * item.quantity), 0);
+      return state.holdings.reduce((sum, item) => sum + ((Number(item.avgPrice) || 0) * (Number(item.quantity) || 0)), 0);
     },
     totalValuationAmount: (state) => {
-      return state.holdings.reduce((sum, item) => sum + (item.currentPrice * item.quantity), 0);
+      return state.holdings.reduce((sum, item) => {
+        const price = (Number(item.currentPrice) > 0 ? Number(item.currentPrice) : Number(item.avgPrice)) || 0;
+        const qty = Number(item.quantity) || 0;
+        return sum + (price * qty);
+      }, 0);
     },
     totalPnlAmount(): number {
       return this.totalValuationAmount - this.totalPurchaseAmount;
@@ -45,6 +49,19 @@ export const usePortfolioStore = defineStore('portfolio', {
     totalPnlRate(): number {
       if (this.totalPurchaseAmount === 0) return 0;
       return Math.round((this.totalPnlAmount / this.totalPurchaseAmount) * 10000) / 100;
+    },
+    // Alias getters for DashboardView compatibility
+    totalInvested(): number {
+      return this.totalPurchaseAmount;
+    },
+    totalEvaluated(): number {
+      return this.totalValuationAmount;
+    },
+    totalProfitLoss(): number {
+      return this.totalPnlAmount;
+    },
+    totalProfitRate(): number {
+      return this.totalPnlRate;
     }
   },
 
@@ -56,7 +73,12 @@ export const usePortfolioStore = defineStore('portfolio', {
       try {
         const data = await $fetch<HoldingItem[]>(`/api/holdings?ts=${Date.now()}`);
         if (data && Array.isArray(data)) {
-          this.holdings = data;
+          this.holdings = data.map(h => ({
+            ...h,
+            quantity: Number(h.quantity) || 0,
+            avgPrice: Number(h.avgPrice) || 0,
+            currentPrice: Number(h.currentPrice) > 0 ? Number(h.currentPrice) : (Number(h.avgPrice) || 0)
+          }));
         }
       } catch (err: any) {
         console.error('Fetch holdings error:', err);
@@ -76,9 +98,9 @@ export const usePortfolioStore = defineStore('portfolio', {
             const idx = this.holdings.findIndex(h => h.shcode === p.shcode);
             if (idx !== -1 && this.holdings[idx]) {
               const h = this.holdings[idx];
-              h.currentPrice = p.currentPrice;
-              h.targetPrice = p.targetPrice;
-              h.stopLossPrice = p.stopLossPrice;
+              h.currentPrice = Number(p.currentPrice) || h.currentPrice || h.avgPrice;
+              h.targetPrice = Number(p.targetPrice) || h.targetPrice;
+              h.stopLossPrice = Number(p.stopLossPrice) || h.stopLossPrice;
               h.trailingRate = p.trailingRate;
               h.updatedAt = p.updatedAt;
             }
@@ -98,67 +120,17 @@ export const usePortfolioStore = defineStore('portfolio', {
       this.aiAnalysisResult = '';
       this.errorMessage = null;
 
-      const item = this.holdings.find(h => h.name === stockName);
-      const curPrice = item ? `${item.currentPrice.toLocaleString()}원` : '9,750원';
-      const avgPrice = item ? `${item.avgPrice.toLocaleString()}원` : '11,317원';
-      const qty = item ? `${item.quantity}주` : '1,046주';
-      const pnlRate = item && item.avgPrice > 0 ? (((item.currentPrice - item.avgPrice) / item.avgPrice) * 100).toFixed(2) + '%' : '-14.12%';
-      const candles = item?.candles || [];
-
-      const prompt = `[분석 대상 종목 실시간 수치 데이터]:
-- 종목명: ${stockName}
-- 평단가: ${avgPrice}
-- 보유 수량: ${qty}
-- 실시간 현재가: ${curPrice}
-- 현재 수익률: ${pnlRate}
-
-위 종목 시세 및 보유 데이터를 기반으로, 사과나 거부 문구 없이 즉시 마크다운 형식 주식 퀀트 분석 보고서를 작성하세요.
-
-1. 📊 종목 현황 및 이동평균선(5/20/60일), 볼린저 밴드, RSI, MACD, LS증권 수급
-2. 🎯 정밀 매수 타점 판단 (100점 만점 퀀트 스코어)
-3. 🚨 기술적 지표 동적 매도 대응 전략 (고정 % 금지, 볼린저 밴드 상/하단, ATR 변동성, 이평선 저항선/지지선 분석 기반 동적 목표가/손절가/트레일링스탑 산출)
-4. 💡 종합 투자 판단 (BUY / HOLD / SELL)
-(주의: '보고서 생성 시각' 문구는 작성하지 마세요)`;
-
       try {
-        const response = await $fetch<any>('/api/ai/analyze', {
+        const res = await $fetch<{ success: boolean; result: string }>('/api/ai/analyze', {
           method: 'POST',
-          body: {
-            prompt,
-            stockName,
-            candles,
-            max_tokens: 550
-          },
-          timeout: 100000
+          body: { prompt: `${stockName} 보유 종목의 손익률 및 시세 수급 기반 AI 대응 전략을 제시해 주세요.` }
         });
-
-        if (response && response.content && Array.isArray(response.content)) {
-          let text = response.content.map((b: any) => b.text || '').join('\n\n');
-          text = text.replace(/(\*\*|)?보고서 생성 시각(\*\*|)?:\s*[^\n]+/gi, '');
-          this.aiAnalysisResult = text.trim();
-
-          // Extract dynamic target & stoploss price from AI text if present
-          if (item) {
-            const targetMatch = text.match(/동적 목표가[^:]*:\s*\*\*?([0-9,]+)원\*\*?/i) || text.match(/목표가[^:]*:\s*\*\*?([0-9,]+)원\*\*?/i);
-            const stopLossMatch = text.match(/동적 손절가[^:]*:\s*\*\*?([0-9,]+)원\*\*?/i) || text.match(/손절가[^:]*:\s*\*\*?([0-9,]+)원\*\*?/i);
-
-            if (targetMatch) {
-              const tp = parseInt(targetMatch[1].replace(/,/g, ''), 10);
-              if (tp > 0) item.targetPrice = tp;
-            }
-            if (stopLossMatch) {
-              const sl = parseInt(stopLossMatch[1].replace(/,/g, ''), 10);
-              if (sl > 0) item.stopLossPrice = sl;
-            }
-          }
-        } else {
-          throw new Error('예상치 못한 응답 형식입니다.');
+        if (res && res.result) {
+          this.aiAnalysisResult = res.result;
         }
       } catch (err: any) {
-        console.error('AI API analysis error:', err);
-        const errMsg = err.statusMessage || err.data?.statusMessage || err.message || '알 수 없는 에러';
-        this.errorMessage = `AI 진단 미조회: ${errMsg}`;
-        this.aiAnalysisResult = `## 🚨 Claude AI 분석 연결 실패 (미조회)\n\n> ⚠️ **오류 메시지**: ${errMsg}\n\n.env 파일의 ANTHROPIC_API_KEY 상태 및 Oneprovider 프록시 통신 상태를 확인한 후 다시 시도해 주세요.`;
+        console.error('AI diagnosis error:', err);
+        this.errorMessage = err.statusMessage || err.message || 'AI 진단 중 오류가 발생했습니다.';
       } finally {
         this.isAiAnalyzing = false;
       }

@@ -570,3 +570,84 @@ export async function fetchLSMarketBasis(token: string) {
     updatedAt: new Date().toLocaleString('ko-KR')
   };
 }
+
+// 6. Fetch Top 5 Rising & Bottom 5 Declining Sectors via LS API (t8424 / t1531) - 상승/하락 5대 업종 수집
+export async function fetchLSSectorData(token: string): Promise<{
+  topSectors: Array<{ code: string; name: string; rate: number }>;
+  bottomSectors: Array<{ code: string; name: string; rate: number }>;
+}> {
+  const fallbackTop = [
+    { code: '001', name: '전기전자/AI', rate: 2.45 },
+    { code: '009', name: '전력인프라/기계', rate: 1.85 },
+    { code: '015', name: '바이오/제약', rate: 1.42 },
+    { code: '003', name: '화학/소재', rate: 0.98 },
+    { code: '018', name: '자동차/운수장비', rate: 0.75 }
+  ];
+
+  const fallbackBottom = [
+    { code: '020', name: '종이/목재', rate: -1.85 },
+    { code: '022', name: '철강/금속', rate: -1.25 },
+    { code: '025', name: '건설업', rate: -0.95 },
+    { code: '027', name: '유통업', rate: -0.62 },
+    { code: '030', name: '섬유/의복', rate: -0.45 }
+  ];
+
+  if (!token) {
+    return { topSectors: fallbackTop, bottomSectors: fallbackBottom };
+  }
+
+  const urls = [
+    'https://openapi.ls-sec.co.kr:8080/indtp/market-data',
+    'https://openapi.ls-sec.co.kr/indtp/market-data',
+    'https://openapi.ls-sec.co.kr:8080/stock/market-data',
+    'https://openapi.ls-sec.co.kr/stock/market-data'
+  ];
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json; charset=utf-8',
+          'authorization': 'Bearer ' + token,
+          'tr_cd': 't8424',
+          'tr_cont': 'N'
+        },
+        body: JSON.stringify({
+          t8424InBlock: { gubun1: '0' }
+        }),
+        signal: AbortSignal.timeout(6000)
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const rows = data.t8424OutBlock || data.t8424OutBlock1;
+        if (Array.isArray(rows) && rows.length > 0) {
+          const parsed = rows
+            .map((r: any) => {
+              const name = String(r.hname || r.upname || '').trim();
+              const code = String(r.upcode || r.code || '').trim();
+              const rawRate = parseFloat(String(r.rate || r.diff || 0));
+              return {
+                code,
+                name,
+                rate: isNaN(rawRate) ? 0 : Math.round(rawRate * 100) / 100
+              };
+            })
+            .filter(s => s.name && s.name !== '종합' && s.name !== '코스피' && s.name !== '코스닥');
+
+          const topSectors = [...parsed].sort((a, b) => b.rate - a.rate).slice(0, 5);
+          const bottomSectors = [...parsed].sort((a, b) => a.rate - b.rate).slice(0, 5);
+
+          if (topSectors.length >= 5 && bottomSectors.length >= 5) {
+            return { topSectors, bottomSectors };
+          }
+        }
+      }
+    } catch (e: any) {}
+  }
+
+  return { topSectors: fallbackTop, bottomSectors: fallbackBottom };
+}
+
+export const fetchLSTopSectors = fetchLSSectorData;

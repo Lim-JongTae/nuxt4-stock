@@ -212,6 +212,7 @@ export interface StockItem {
     priceDiffRate: number;
     volumeDiffRate: number;
   } | null;
+  changeRate?: number;
   score: number;
   isFullyMatched: boolean;
   createdAt: string;
@@ -229,7 +230,20 @@ export interface MarketBasisInfo {
   updatedAt: string;
 }
 
-// 15. 스크리너 API 통신 응답 타입
+// 15. LS증권 상위 상승 유망 업종 타입 (t8424 / t1531)
+export interface TopSectorInfo {
+  code: string;
+  name: string;
+  rate: number;
+}
+
+// 16. Claude AI 시장 정밀 진단 결과 타입
+export interface AiMarketAnalysisInfo {
+  content: string;
+  createdAt: string;
+}
+
+// 17. 스크리너 API 통신 응답 타입
 export interface ScreenerApiResponse {
   success: boolean;
   timestamp: string;
@@ -238,4 +252,6 @@ export interface ScreenerApiResponse {
   oldData: StockItem[];
   newData: StockItem[];
   marketBasis?: MarketBasisInfo | null;
+  topSectors?: TopSectorInfo[];
+  bottomSectors?: TopSectorInfo[];
 }

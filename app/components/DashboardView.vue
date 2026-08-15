@@ -31,71 +31,57 @@
           <NuxtLink to="/portfolio" class="px-4 py-2.5 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-500/20 flex items-center gap-2 transition-all active:scale-95">
             <i class="fas fa-wallet"></i> 보유종목 상세관리
           </NuxtLink>
-          <NuxtLink to="/screener" class="px-4 py-2.5 rounded-xl bg-glinear-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 flex items-center gap-2 transition-all active:scale-95">
+          <NuxtLink to="/screener" class="px-4 py-2.5 rounded-xl bg-linear-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 flex items-center gap-2 transition-all active:scale-95">
             <i class="fas fa-search-dollar"></i> 관심종목 스크리너 이동
           </NuxtLink>
         </div>
       </div>
     </div>
 
-    <!-- Key Metrics Cards Grid -->
+    <!-- Portfolio Summary Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <!-- Total Investment Amount -->
-      <NuxtLink to="/portfolio" class="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl space-y-2 shadow-lg hover:border-purple-500/50 hover:bg-slate-900 transition-all cursor-pointer block group">
-        <div class="flex items-center justify-between text-xs text-slate-400 group-hover:text-purple-300">
-          <span>총 매수금액</span>
-          <i class="fas fa-coins text-amber-400"></i>
+      <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 shadow-lg relative overflow-hidden space-y-1">
+        <div class="flex items-center justify-between text-slate-400 text-xs font-semibold">
+          <span>총 매수금액 (보유종목)</span>
+          <i class="fas fa-coins text-amber-400 text-base"></i>
         </div>
-        <div class="text-2xl font-extrabold text-white font-mono">
+        <div class="text-xl font-black text-white font-mono">
           {{ formatKrw(portfolioStore.totalPurchaseAmount) }}
         </div>
-        <p class="text-[11px] text-slate-400 flex items-center justify-between">
-          <span>보유 종목 평단가 × 수량 합계</span>
-          <span class="text-purple-400 font-bold group-hover:underline">상세보기 &rarr;</span>
-        </p>
-      </NuxtLink>
+        <p class="text-[10px] text-slate-300">보유 수량 × 평균 단가 합계</p>
+      </div>
 
-      <!-- Total Valuation Amount -->
-      <NuxtLink to="/portfolio" class="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl space-y-2 shadow-lg hover:border-cyan-500/50 hover:bg-slate-900 transition-all cursor-pointer block group">
-        <div class="flex items-center justify-between text-xs text-slate-400 group-hover:text-cyan-300">
-          <span>총 평가금액</span>
-          <i class="fas fa-chart-line text-cyan-400"></i>
+      <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 shadow-lg relative overflow-hidden space-y-1">
+        <div class="flex items-center justify-between text-slate-400 text-xs font-semibold">
+          <span>총 평가금액 (실시간 시세)</span>
+          <i class="fas fa-wallet text-indigo-400 text-base"></i>
         </div>
-        <div class="text-2xl font-extrabold text-slate-100 font-mono">
+        <div class="text-xl font-black text-white font-mono">
           {{ formatKrw(portfolioStore.totalValuationAmount) }}
         </div>
-        <p class="text-[11px] text-slate-400 flex items-center justify-between">
-          <span>LS증권 연동 실시간 시세 반영</span>
-          <span class="text-cyan-400 font-bold group-hover:underline">상세보기 &rarr;</span>
-        </p>
-      </NuxtLink>
+        <p class="text-[10px] text-slate-300">보유 수량 × 최신 현재가 합계</p>
+      </div>
 
-      <!-- Total PnL Amount & Rate -->
-      <NuxtLink to="/portfolio" class="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl space-y-2 shadow-lg hover:border-indigo-500/50 hover:bg-slate-900 transition-all cursor-pointer block group">
-        <div class="flex items-center justify-between text-xs text-slate-400 group-hover:text-indigo-300">
-          <span>평가 손익 (수익률)</span>
-          <i class="fas fa-percentage" :class="portfolioStore.totalPnlAmount >= 0 ? 'text-rose-400' : 'text-emerald-400'"></i>
+      <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 shadow-lg relative overflow-hidden space-y-1">
+        <div class="flex items-center justify-between text-slate-400 text-xs font-semibold">
+          <span>총 평가손익</span>
+          <i class="fas fa-chart-line text-emerald-400 text-base"></i>
         </div>
-        <div class="text-2xl font-extrabold font-mono flex items-baseline gap-2" :class="portfolioStore.totalPnlAmount >= 0 ? 'text-rose-400' : 'text-emerald-400'">
-          <span>{{ portfolioStore.totalPnlAmount >= 0 ? '+' : '' }}{{ formatKrw(portfolioStore.totalPnlAmount) }}</span>
-          <span class="text-sm">({{ portfolioStore.totalPnlRate >= 0 ? '+' : '' }}{{ portfolioStore.totalPnlRate }}%)</span>
+        <div class="text-xl font-black font-mono" :class="portfolioStore.totalPnlAmount >= 0 ? 'text-rose-400' : 'text-cyan-400'">
+          {{ portfolioStore.totalPnlAmount >= 0 ? '+' : '' }}{{ formatKrw(portfolioStore.totalPnlAmount) }}
         </div>
-        <p class="text-[11px] text-slate-400 flex items-center justify-between">
-          <span>실시간 누적 손익 상태</span>
-          <span class="text-indigo-400 font-bold group-hover:underline">상세보기 &rarr;</span>
-        </p>
-      </NuxtLink>
+        <p class="text-[10px] text-slate-300">평가금액 - 총 매수금액</p>
+      </div>
 
-      <!-- Monitored Screener Matched Count -->
-      <div class="bg-slate-900/80 border border-slate-800 p-5 rounded-2xl space-y-2 shadow-lg">
-        <div class="flex items-center justify-between text-xs text-slate-400">
-          <span>기술적 매수조건 포착</span>
-          <i class="fas fa-check-circle text-emerald-400"></i>
+      <div class="bg-slate-900/60 border border-slate-800 rounded-2xl p-5 shadow-lg relative overflow-hidden space-y-1">
+        <div class="flex items-center justify-between text-slate-400 text-xs font-semibold">
+          <span>총 수익률</span>
+          <i class="fas fa-percentage text-purple-400 text-base"></i>
         </div>
-        <div class="text-2xl font-extrabold text-emerald-400 font-mono">
-          {{ screenerStore.matchedCount }} <span class="text-sm text-slate-300">개 종목 (100%)</span>
+        <div class="text-xl font-black font-mono" :class="portfolioStore.totalPnlRate >= 0 ? 'text-rose-400' : 'text-cyan-400'">
+          {{ portfolioStore.totalPnlRate >= 0 ? '+' : '' }}{{ portfolioStore.totalPnlRate }}%
         </div>
-        <p class="text-[11px] text-slate-400">6개 매수타점 기술적 지표 완전 매칭</p>
+        <p class="text-[10px] text-slate-300">포트폴리오 총 수익률</p>
       </div>
     </div>
 
@@ -104,34 +90,120 @@
       
       <!-- Market Strategy (Left 2 cols) -->
       <div class="lg:col-span-2 bg-slate-900/60 border border-slate-800 rounded-2xl p-6 space-y-4 shadow-xl">
-        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
           <h3 class="text-sm font-bold text-white flex items-center gap-2">
             <i class="fas fa-chess text-indigo-400"></i>
             <span>오늘의 시장 종합 분석 및 대응 전략</span>
           </h3>
-          <span class="text-[11px] text-slate-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
-            분석 일시: {{ screenerStore.lastUpdated || '2026-08-11 13:00' }}
-          </span>
+          <div class="flex items-center gap-2">
+            <span class="text-[11px] text-slate-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 font-mono">
+              시세 갱신: {{ screenerStore.lastUpdated || '실시간' }}
+            </span>
+          </div>
+        </div>
+
+        <!-- LS Securities Real-time Top 5 Rising Sectors Bar -->
+        <div class="bg-slate-950/80 border border-indigo-500/30 p-3 rounded-xl space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold text-indigo-300 flex items-center gap-1.5">
+              <i class="fas fa-fire text-amber-400"></i> LS증권 실시간 상위 5대 유망 업종 (t8424 / t1531 파싱)
+            </span>
+            <span class="text-[10px] text-rose-400 font-mono">실시간 상승률 순</span>
+          </div>
+          <div class="flex flex-wrap items-center gap-1.5">
+            <template v-if="screenerStore.topSectors && screenerStore.topSectors.length > 0">
+              <span 
+                v-for="s in screenerStore.topSectors" 
+                :key="s.code" 
+                class="px-2.5 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold flex items-center gap-1 shadow-xs"
+              >
+                <span>{{ s.name }}</span>
+                <span class="text-rose-400 font-extrabold text-[11px] font-mono">+{{ s.rate }}%</span>
+              </span>
+            </template>
+            <template v-else>
+              <span class="text-xs text-slate-400">유망 업종 파싱 중...</span>
+            </template>
+          </div>
+        </div>
+
+        <!-- LS Securities Real-time Bottom 5 Declining Sectors Bar -->
+        <div class="bg-slate-950/80 border border-emerald-500/30 p-3 rounded-xl space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold text-emerald-300 flex items-center gap-1.5">
+              <i class="fas fa-arrow-trend-down text-indigo-300"></i> LS증권 실시간 하락/약세 5대 업종 (t8424 / t1531 파싱)
+            </span>
+            <span class="text-[10px] text-emerald-400 font-mono">실시간 하락률 순</span>
+          </div>
+          <div class="flex flex-wrap items-center gap-1.5">
+            <template v-if="screenerStore.bottomSectors && screenerStore.bottomSectors.length > 0">
+              <span 
+                v-for="s in screenerStore.bottomSectors" 
+                :key="s.code" 
+                class="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-indigo-300 text-xs font-semibold flex items-center gap-1 shadow-xs"
+              >
+                <span>{{ s.name }}</span>
+                <span class="text-emerald-400 font-extrabold text-[11px] font-mono">{{ s.rate >= 0 ? '+' : '' }}{{ s.rate }}%</span>
+              </span>
+            </template>
+            <template v-else>
+              <span class="text-xs text-slate-400">하락 업종 파싱 중...</span>
+            </template>
+          </div>
         </div>
 
         <div class="space-y-3 text-xs text-slate-300 leading-relaxed">
-          <div class="bg-indigo-950/30 border border-indigo-500/20 p-4 rounded-xl space-y-2">
-            <h4 class="font-bold text-indigo-300 flex items-center gap-1.5 text-sm">
-              <i class="fas fa-shield-alt text-indigo-400"></i> 1. 종합 시장 관점 및 리스크 관리
-            </h4>
-            <p>
-              미국 로봇/AI 및 전력 인프라 세무 수혜업종 중심으로 반등 국면 지속 중. 기술적 과매도 탈출(RSI 30 돌파 + 심리선 25% 이하) 종목에 수급 유입세 포착.
-            </p>
+          <!-- Section 1: Comprehensive Market Perspective (Rule-Based + AI Hybrid) -->
+          <div class="bg-indigo-950/30 border border-indigo-500/30 p-4 rounded-xl space-y-3 relative overflow-hidden">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-500/20 pb-2">
+              <h4 class="font-bold text-indigo-300 flex items-center gap-1.5 text-sm">
+                <i class="fas fa-shield-alt text-indigo-400"></i> 1. 종합 시장 관점 및 리스크 관리
+              </h4>
+              <button 
+                @click="triggerAiDiagnosis" 
+                :disabled="screenerStore.isAiAnalyzing"
+                class="px-3 py-1 rounded-lg bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-extrabold text-[11px] shadow-sm flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+              >
+                <i class="fas" :class="screenerStore.isAiAnalyzing ? 'fa-spinner fa-spin text-amber-300' : 'fa-robot text-purple-300'"></i>
+                <span>{{ screenerStore.isAiAnalyzing ? 'Claude AI 정밀 분석 중...' : (screenerStore.aiMarketAnalysis ? '🤖 AI 재진단 갱신' : '🤖 Claude AI 정밀 진단') }}</span>
+              </button>
+            </div>
+
+            <!-- AI Diagnosis Result (When available) -->
+            <div v-if="screenerStore.aiMarketAnalysis" class="bg-purple-950/40 border border-purple-500/40 p-3 rounded-lg space-y-1.5 shadow-md">
+              <div class="flex items-center justify-between text-[10px] text-purple-300 font-bold border-b border-purple-500/20 pb-1">
+                <span><i class="fas fa-sparkles text-amber-300"></i> Anthropic Claude AI 수석 분석가 정밀 진단</span>
+                <span class="font-mono text-purple-400">작성일시: {{ screenerStore.aiMarketAnalysis.createdAt }}</span>
+              </div>
+              <p class="text-slate-200 text-xs font-medium leading-relaxed whitespace-pre-line">
+                {{ screenerStore.aiMarketAnalysis.content }}
+              </p>
+            </div>
+
+            <!-- Rule-Based Perspective (0ms Default) -->
+            <div class="space-y-1">
+              <div class="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">
+                실시간 룰 베이스 시장 총평 (0ms 지표 자동 연산):
+              </div>
+              <p class="text-slate-300 text-xs leading-relaxed">
+                {{ ruleBasedPerspective }}
+              </p>
+            </div>
+
+            <div v-if="aiError" class="text-rose-400 text-[11px] bg-rose-950/60 p-2 rounded border border-rose-500/30">
+              <i class="fas fa-exclamation-triangle mr-1"></i> {{ aiError }}
+            </div>
           </div>
 
+          <!-- Section 2: Precise Buy/Sell Response Guideline -->
           <div class="bg-emerald-950/20 border border-emerald-500/20 p-4 rounded-xl space-y-2">
             <h4 class="font-bold text-emerald-300 flex items-center gap-1.5 text-sm">
               <i class="fas fa-bullseye text-emerald-400"></i> 2. 정밀 매수/매도 대응 가이드라인
             </h4>
-            <ul class="list-disc list-inside space-y-1 text-slate-300">
-              <li><strong class="text-emerald-400">매수 전략</strong>: 퀀트 스코어 85점 이상 포착 종목에 한해 동적 손익비(RRR 1:2 이상) 설정 후 분할 매수.</li>
-              <li><strong class="text-indigo-300">기술적 동적 목표가</strong>: 볼린저 밴드 상단 저항선 및 ATR 변동성 기반 동적 목표가 설정.</li>
-              <li><strong class="text-rose-400">기술적 동적 손절가</strong>: 볼린저 밴드 하단 지지선 및 주봉 60일선 이탈 시 기계적 손절.</li>
+            <ul class="list-disc list-inside space-y-1.5 text-slate-300">
+              <li><strong class="text-emerald-400">매수 전략</strong>: {{ buyStrategy }}</li>
+              <li><strong class="text-indigo-300">기술적 동적 목표가</strong>: {{ targetPriceStrategy }}</li>
+              <li><strong class="text-rose-400">기술적 동적 손절가</strong>: {{ stopLossStrategy }}</li>
             </ul>
           </div>
         </div>
@@ -154,29 +226,28 @@
             v-else 
             class="text-[10px] px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-extrabold flex items-center gap-1"
           >
-            <i class="fas fa-info-circle text-amber-400"></i> 85점 이상 없음 (현재 최고점수 Top 3)
+            <i class="fas fa-info-circle text-amber-400"></i> 85점 이상 없음 (상위 Top 3)
           </span>
         </div>
 
-        <div v-if="screenerStore.isRefreshing && screenerStore.topBuyRecommendations.length === 0" class="text-center py-8 text-slate-400 text-xs flex items-center justify-center gap-2">
-          <i class="fas fa-spinner fa-spin text-indigo-400"></i>
-          <span>LS증권 API 스크리너 데이터 수집 중...</span>
-        </div>
-
-        <div v-else-if="screenerStore.topBuyRecommendations.length === 0" class="text-center py-8 text-slate-500 text-xs">
-          스크리너 데이터 불러오는 중입니다...
+        <div v-if="screenerStore.topBuyRecommendations.length === 0" class="text-center py-8 text-slate-500 text-xs">
+          분석 데이터가 존재하지 않습니다. 관심종목을 등록해 주세요.
         </div>
 
         <div v-else class="space-y-3">
           <div 
-            v-for="item in screenerStore.topBuyRecommendations" 
+            v-for="(item, idx) in screenerStore.topBuyRecommendations" 
             :key="item.shcode"
-            class="bg-slate-950/80 border border-emerald-500/30 p-3.5 rounded-xl space-y-2 hover:border-emerald-400/50 transition-all"
+            class="bg-slate-950/80 border p-3.5 rounded-xl space-y-2 transition-all hover:scale-[1.01]"
+            :class="item.score >= 85 ? 'border-emerald-500/50 shadow-emerald-500/5 shadow-md' : 'border-slate-800'"
           >
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
-                <span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold text-[10px]">{{ item.industry }}</span>
-                <h4 class="font-bold text-white text-xs">{{ item.name }}</h4>
+                <span class="w-5 h-5 rounded-full bg-slate-800 text-slate-300 font-mono font-bold text-[10px] flex items-center justify-center">
+                  {{ idx + 1 }}
+                </span>
+                <span class="font-bold text-white text-xs">{{ item.name }}</span>
+                <span class="text-[10px] text-slate-400 font-mono">({{ item.shcode }})</span>
               </div>
               <span class="px-2 py-0.5 rounded text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                 {{ item.score }}점 / 100점
@@ -213,13 +284,16 @@
 import { ref, onMounted } from 'vue';
 import { usePortfolioStore } from '~/stores/usePortfolioStore';
 import { useScreenerStore } from '~/stores/useScreenerStore';
+import { useMarketStrategy } from '~/composables/useMarketStrategy';
 import StockEditModal, { type StockItemForm } from '~/components/StockEditModal.vue';
 
 const portfolioStore = usePortfolioStore();
 const screenerStore = useScreenerStore();
+const { ruleBasedPerspective, buyStrategy, targetPriceStrategy, stopLossStrategy } = useMarketStrategy();
 
 const isModalOpen = ref(false);
 const selectedStockForEdit = ref<StockItemForm | null>(null);
+const aiError = ref<string | null>(null);
 
 function openAddModal() {
   selectedStockForEdit.value = null;
@@ -229,6 +303,15 @@ function openAddModal() {
 async function handleStockSaved() {
   await portfolioStore.fetchHoldings(true);
   await screenerStore.loadInitial(true);
+}
+
+async function triggerAiDiagnosis() {
+  aiError.value = null;
+  try {
+    await screenerStore.runAiMarketDiagnosis();
+  } catch (err: any) {
+    aiError.value = err.statusMessage || err.message || 'Claude AI 정밀 진단 호출 중 오류가 발생했습니다.';
+  }
 }
 
 onMounted(async () => {
