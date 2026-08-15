@@ -23,6 +23,8 @@
 - **Store 및 LocalStorage 저장 & 15일 보존**: 최초 코드 실행 및 진입 시 수집한 시세/공매도 데이터를 Pinia Store 및 LocalStorage에 15일 동안 보전하고 활용한다. 15일 이상 경과 데이터는 자동 제거한다.
 - **새로고침 실시간 갱신**: 매회 새로고침(F5) 및 시세 조회 시 LS증권 API를 호출하여 새로운 데이터로 Store 및 LocalStorage를 실시간 갱신(업데이트)하고 모든 화면에 표기한다.
 - **자료 수집 실패 시 오류 표기**: 자료를 수신받지 못하거나 API 통신 실패 시 대체/가짜 데이터를 생성하지 말고 붉은색 오류 배너로 사유를 명확하게 표시한다.
+- **타입 중앙 집중 관리**: LS증권 Open API 데이터 타입 및 Claude AI 분석 데이터 타입 등 모든 TypeScript 데이터 타입 정의는 프로젝트 루트의 `utils/types/` 디렉터리(`lsSecurities.ts`, `claudeApi.ts`, `index.ts` 등) 내에 중앙 집중적으로 정의하고, 필요 시 가져와서(import) 사용한다.
+- **중앙집중식 데이터 및 계산 아키텍처**: UI 화면(View)은 모든 종목 자료를 Pinia Store에서 우선 로드(0ms)하여 표기하며 무의미한 외부 토큰 소비를 방지한다. 사용자의 새로고침(F5) 또는 AI 정밀 진단 요청 시에만 외부 API(LS증권 Open API / Anthropic Claude API)를 호출하여 원시 데이터를 수신 및 Store에 저장하고, Composable 비즈니스 로직에서 8대 지표 및 퀀트 매매 판단을 계산하여 Store 및 LocalStorage(15일 보존)를 실시간 갱신한 후 UI 화면에 표시한다.
 
 ### 보고서 위치
 

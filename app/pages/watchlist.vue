@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-b from-slate-900 to-indigo-900 text-white">
+  <div class="min-h-screen bg-linear-to-b from-slate-900 to-indigo-900 text-white">
     <WatchlistView />
   </div>
 </template>

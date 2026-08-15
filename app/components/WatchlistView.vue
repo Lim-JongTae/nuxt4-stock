@@ -37,28 +37,28 @@
         <table class="w-full text-left text-xs border-collapse">
           <thead class="bg-slate-950 text-slate-300 font-bold border-b border-slate-800">
             <tr>
-              <th class="px-4 py-3">코드</th>
-              <th class="px-4 py-3">종목명</th>
-              <th class="px-4 py-3">구분</th>
-              <th class="px-4 py-3">업종/분류</th>
-              <th class="px-4 py-3">현재가 (LS증권)</th>
-              <th class="px-4 py-3 text-purple-400">심리선 (PSY)</th>
-              <th class="px-4 py-3 text-amber-400">거래량수급 (비율)</th>
-              <th class="px-4 py-3 text-rose-400">공매도 수급</th>
-              <th class="px-4 py-3 text-emerald-400">퀀트 스코어</th>
-              <th class="px-4 py-3 text-right">최종 갱신</th>
+              <th class="px-4 py-3 whitespace-nowrap">코드</th>
+              <th class="px-4 py-3 whitespace-nowrap">종목명</th>
+              <th class="px-4 py-3 whitespace-nowrap">구분</th>
+              <th class="px-4 py-3 whitespace-nowrap">업종/분류</th>
+              <th class="px-4 py-3 whitespace-nowrap">현재가 (LS증권)</th>
+              <th class="px-4 py-3 text-purple-400 whitespace-nowrap">심리선 (PSY)</th>
+              <th class="px-4 py-3 text-amber-400 whitespace-nowrap">거래량수급 (비율)</th>
+              <th class="px-4 py-3 text-rose-400 whitespace-nowrap">공매도 수급</th>
+              <th class="px-4 py-3 text-emerald-400 whitespace-nowrap">퀀트 스코어</th>
+              <th class="px-4 py-3 text-right whitespace-nowrap">최종 갱신</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-800/60 text-slate-200">
             <tr v-for="item in store.items" :key="item.shcode" class="hover:bg-slate-800/40 transition-all">
-              <td class="px-4 py-3 font-mono font-bold text-indigo-300">{{ item.shcode }}</td>
-              <td class="px-4 py-3 font-bold text-white">
+              <td class="px-4 py-3 font-mono font-bold text-indigo-300 whitespace-nowrap">{{ item.shcode }}</td>
+              <td class="px-4 py-3 font-bold text-white whitespace-nowrap" :title="item.name">
                 <NuxtLink :to="`/stock/${item.shcode}`" class="hover:text-cyan-300 hover:underline flex items-center gap-1.5">
-                  <span>{{ item.name }}</span>
-                  <i class="fas fa-external-link-alt text-[10px] text-slate-500"></i>
+                  <span>{{ truncateName(item.name, 13) }}</span>
+                  <i class="fas fa-external-link-alt text-[10px] text-slate-500 shrink-0"></i>
                 </NuxtLink>
               </td>
-              <td class="px-4 py-3">
+              <td class="px-4 py-3 whitespace-nowrap">
                 <span 
                   class="px-2 py-0.5 rounded text-[10px] font-bold border"
                   :class="item.type === 'holding' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'"
@@ -66,21 +66,21 @@
                   {{ item.type === 'holding' ? '보유' : '관심' }}
                 </span>
               </td>
-              <td class="px-4 py-3 text-slate-400">{{ item.industry }}</td>
-              <td class="px-4 py-3 font-mono font-bold text-cyan-300 text-sm">
+              <td class="px-4 py-3 text-slate-400 whitespace-nowrap">{{ item.industry }}</td>
+              <td class="px-4 py-3 font-mono font-bold text-cyan-300 text-sm whitespace-nowrap">
                 {{ item.currentPrice > 0 ? Number(item.currentPrice).toLocaleString() + '원' : '조회 중...' }}
               </td>
-              <td class="px-4 py-3 font-mono font-bold">
+              <td class="px-4 py-3 font-mono font-bold whitespace-nowrap">
                 <span :class="typeof item.psy === 'number' && item.psy <= 25 ? 'text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-500/30' : 'text-slate-300'">
                   {{ typeof item.psy === 'number' ? item.psy + '%' : '-' }}
                 </span>
               </td>
-              <td class="px-4 py-3 font-mono font-bold">
+              <td class="px-4 py-3 font-mono font-bold whitespace-nowrap">
                 <span :class="typeof item.volumeRatio === 'number' && item.volumeRatio >= 120 ? 'text-amber-300 bg-amber-950/40 px-2 py-0.5 rounded border border-amber-500/30' : 'text-slate-300'">
                   {{ typeof item.volumeRatio === 'number' ? item.volumeRatio + '%' : '-' }}
                 </span>
               </td>
-              <td class="px-4 py-3">
+              <td class="px-4 py-3 whitespace-nowrap">
                 <span 
                   class="px-2 py-0.5 rounded text-[10px] font-bold border"
                   :class="{
@@ -93,10 +93,10 @@
                   {{ item.shortSellingStatus || '실시간 분석' }}
                 </span>
               </td>
-              <td class="px-4 py-3 font-mono font-extrabold text-purple-300">
+              <td class="px-4 py-3 font-mono font-extrabold text-purple-300 whitespace-nowrap">
                 {{ item.score ? item.score + '점' : '0점' }}
               </td>
-              <td class="px-4 py-3 text-xs text-slate-500 text-right font-mono">{{ item.updatedAt }}</td>
+              <td class="px-4 py-3 text-xs text-slate-500 text-right font-mono whitespace-nowrap">{{ item.updatedAt }}</td>
             </tr>
           </tbody>
         </table>
@@ -106,13 +106,21 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import { useWatchlistStore } from '@/stores/useWatchlistStore';
 
 const store = useWatchlistStore();
 
-store.loadInitial();
+onMounted(() => {
+  store.loadInitial(false);
+});
 
 function refresh() {
-  store.refresh();
+  store.loadInitial(true);
+}
+
+function truncateName(name: string, maxLen: number = 13): string {
+  if (!name) return '';
+  return name.length > maxLen ? `${name.slice(0, maxLen)}...` : name;
 }
 </script>

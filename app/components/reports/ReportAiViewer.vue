@@ -16,7 +16,7 @@
           <select 
             :value="selectedShcode" 
             @change="$emit('change-stock', ($event.target as HTMLSelectElement).value)"
-            class="bg-slate-950 text-xs text-white border border-slate-700 px-3 py-2 rounded-xl focus:outline-none focus:border-purple-500 hover:cursor-pointer cursor-pointer font-bold"
+            class="bg-slate-950 text-xs text-white border border-slate-700 px-3 py-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/50 hover:cursor-pointer cursor-pointer font-bold"
           >
             <option v-for="s in stockList" :key="s.shcode" :value="s.shcode">
               {{ s.name }} ({{ s.shcode }}) - {{ s.score }}점

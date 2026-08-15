@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-6">
     <!-- Top Executive Header Banner -->
-    <div class="bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-500/30 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+    <div class="bg-linear-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-500/30 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
       <div class="absolute -right-10 -bottom-10 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -24,14 +24,14 @@
         <div class="flex flex-wrap items-center gap-3">
           <button 
             @click="openAddModal"
-            class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
+            class="px-4 py-2.5 rounded-xl bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
           >
             <i class="fas fa-plus-circle"></i> 종목 추가 / 편집
           </button>
-          <NuxtLink to="/portfolio" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-500/20 flex items-center gap-2 transition-all active:scale-95">
+          <NuxtLink to="/portfolio" class="px-4 py-2.5 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-500/20 flex items-center gap-2 transition-all active:scale-95">
             <i class="fas fa-wallet"></i> 보유종목 상세관리
           </NuxtLink>
-          <NuxtLink to="/screener" class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 flex items-center gap-2 transition-all active:scale-95">
+          <NuxtLink to="/screener" class="px-4 py-2.5 rounded-xl bg-glinear-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 flex items-center gap-2 transition-all active:scale-95">
             <i class="fas fa-search-dollar"></i> 관심종목 스크리너 이동
           </NuxtLink>
         </div>
@@ -227,13 +227,13 @@ function openAddModal() {
 }
 
 async function handleStockSaved() {
-  await portfolioStore.fetchHoldings();
-  await screenerStore.refreshScreener();
+  await portfolioStore.fetchHoldings(true);
+  await screenerStore.loadInitial(true);
 }
 
 onMounted(async () => {
-  await portfolioStore.fetchHoldings();
-  await screenerStore.refreshScreener();
+  await portfolioStore.fetchHoldings(false);
+  await screenerStore.loadInitial(false);
 });
 
 function formatKrw(val: number) {

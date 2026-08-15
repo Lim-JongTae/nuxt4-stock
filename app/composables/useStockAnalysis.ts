@@ -1,41 +1,7 @@
 import { ref } from 'vue';
 
-export interface StockDetailData {
-  shcode: string;
-  name: string;
-  industry: string;
-  closePrice: number;
-  isHolding: boolean;
-  holdingQuantity?: number;
-  holdingAvgPrice?: number;
-  score: number;
-  isFullyMatched: boolean;
-  conditions: Record<string, boolean>;
-  shortSignal?: {
-    label: string;
-    confidence: string;
-    summary: string;
-  };
-  psy?: number | null;
-  rsi?: number | null;
-  macdHist?: number | null;
-  volumeRatio?: number | null;
-}
-
-export interface CalculatedAnalysisResult {
-  decision: "매도" | "유지" | "매수" | "관찰";
-  badgeClass: string;
-  confidence: "높음" | "중간" | "낮음";
-  targetPrice: number;
-  stopLossPrice: number;
-  expectedReturnRate: number;
-  summary: string;
-  keyReasons: string[];
-  riskFactor: string;
-  actionPlan: string;
-  analyzedAt: string;
-  apiProvider: string;
-}
+import type { StockDetailData, CalculatedAnalysisResult } from '../../utils/types/claudeApi';
+export type { StockDetailData, CalculatedAnalysisResult };
 
 export function useStockAnalysis() {
   const isAnalyzing = ref(false);

@@ -69,15 +69,15 @@
         </NuxtLink>
       </nav>
 
-      <!-- Status Badges -->
+      <!-- Dynamic Status Badges -->
       <div class="hidden lg:flex items-center space-x-2 text-xs">
-        <span class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 flex items-center gap-1.5 shadow-sm">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span class="text-[11px]">LS증권 API: <strong class="text-emerald-400">정상 연동</strong></span>
-        </span>
-        <span class="px-2.5 py-1 rounded-lg bg-indigo-950/60 border border-indigo-800/50 text-indigo-300 flex items-center gap-1.5 shadow-sm">
-          <i class="fas fa-brain text-indigo-400 text-[10px]"></i>
-          <span class="text-[11px]">Anthropic Claude AI</span>
+        <span 
+          class="px-2.5 py-1 rounded-lg border text-slate-300 flex items-center gap-1.5 shadow-sm transition-all"
+          :class="lsApiStatus.borderClass"
+          :title="lsApiStatus.tooltip"
+        >
+          <span class="w-2 h-2 rounded-full" :class="lsApiStatus.dotClass"></span>
+          <span class="text-[11px]">LS증권 API: <strong :class="lsApiStatus.badgeClass">{{ lsApiStatus.text }}</strong></span>
         </span>
       </div>
 
@@ -86,4 +86,50 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
+import { useScreenerStore } from '~/stores/useScreenerStore';
+import { useWatchlistStore } from '~/stores/useWatchlistStore';
+
+const screenerStore = useScreenerStore();
+const watchlistStore = useWatchlistStore();
+
+const lsApiStatus = computed(() => {
+  if (screenerStore.isRefreshing || watchlistStore.isLoading) {
+    return {
+      text: '연동 확인 중...',
+      badgeClass: 'text-amber-400 font-extrabold',
+      dotClass: 'bg-amber-400 animate-pulse',
+      borderClass: 'border-amber-500/30 bg-amber-950/30',
+      tooltip: 'LS증권 API 실시간 데이터를 수신하는 중입니다.'
+    };
+  }
+
+  if (screenerStore.errorMessage || watchlistStore.errorMessage) {
+    return {
+      text: '연동 오류',
+      badgeClass: 'text-rose-400 font-extrabold',
+      dotClass: 'bg-rose-500',
+      borderClass: 'border-rose-500/40 bg-rose-950/40',
+      tooltip: screenerStore.errorMessage || watchlistStore.errorMessage || 'LS증권 API 데이터 수신 오류'
+    };
+  }
+
+  if (screenerStore.newData.length > 0 || watchlistStore.items.length > 0) {
+    return {
+      text: '정상 연동',
+      badgeClass: 'text-emerald-400 font-extrabold',
+      dotClass: 'bg-emerald-400 animate-pulse',
+      borderClass: 'border-slate-800 bg-slate-900',
+      tooltip: 'LS증권 Open API 실시간 데이터 파싱 정상 수신 중'
+    };
+  }
+
+  return {
+    text: '연동 대기 중',
+    badgeClass: 'text-slate-400 font-semibold',
+    dotClass: 'bg-slate-500',
+    borderClass: 'border-slate-800 bg-slate-900',
+    tooltip: '데이터 수신 대기 중'
+  };
+});
 </script>

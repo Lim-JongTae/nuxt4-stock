@@ -22,11 +22,11 @@ export default defineEventHandler(async (event) => {
 
   try {
     const existing = await db.select().from(stocks).where(eq(stocks.shcode, targetCode));
-    if (existing.length === 0) {
+    const current = existing[0];
+    if (!current) {
       throw createError({ statusCode: 404, statusMessage: '해당 종목을 DB에서 찾을 수 없습니다.' });
     }
 
-    const current = existing[0];
     const newName = body.name || current.name;
     const newIndustry = body.industry || current.industry;
     const newType = body.type || current.type;

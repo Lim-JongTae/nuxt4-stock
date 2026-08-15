@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { calculateQuantIndicators } from '../composables/useQuantIndicatorCalculator';
 
 export interface ShortSellRecord {
   date: string;
@@ -144,17 +145,26 @@ export const useStockDetailStore = defineStore('stockDetail', {
       this.saveToStorage();
     },
 
-    // 5. API 실시간 수집 및 캐시/스토어 업데이트
-    async fetchAndCacheStock(shcode: string): Promise<StockDetailStateItem | null> {
+    // 5. API 중앙 수집, Pinia 스토어 갱신 & 15일 LocalStorage 보존
+    async fetchAndCacheStock(shcode: string, forceRefresh = false): Promise<StockDetailStateItem | null> {
       const cleanCode = String(shcode).trim().replace(/^A/i, '');
+      
+      // 1. [평상시] forceRefresh가 false이고 유효한 Pinia/LocalStorage 데이터가 있으면 0ms 즉시 반환 (API 토큰 아낌)
+      if (!forceRefresh) {
+        const cached = this.getStockCache(cleanCode);
+        if (cached) return cached;
+      }
+
       this.isFetching = true;
       this.errorMessage = null;
 
       try {
-        const res = await $fetch<{ success: boolean; data: StockDetailStateItem }>(`/api/stock/${cleanCode}`);
+        // 2. [새로고침 요청 시 또는 데이터 미보유 시만] 중앙 통신 API 호출
+        const res = await $fetch<{ success: boolean; data: any }>(`/api/stock/${cleanCode}`);
         if (res && res.success && res.data) {
-          this.updateStockCache(cleanCode, res.data);
-          return res.data;
+          const calculatedData = calculateQuantIndicators(res.data);
+          this.updateStockCache(cleanCode, calculatedData);
+          return calculatedData;
         } else {
           this.errorMessage = '종목 상세 데이터를 불러오지 못했습니다.';
         }

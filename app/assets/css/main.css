@@ -19,6 +19,13 @@
     min-height: 100vh;
     margin: 0;
   }
+
+  input::placeholder,
+  textarea::placeholder,
+  select::placeholder {
+    color: #475569;
+    opacity: 1;
+  }
 }
 
 /* Custom scrollbar for cyber theme */

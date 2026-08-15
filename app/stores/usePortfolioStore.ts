@@ -49,7 +49,8 @@ export const usePortfolioStore = defineStore('portfolio', {
   },
 
   actions: {
-    async fetchHoldings() {
+    async fetchHoldings(forceRefresh = false) {
+      if (!forceRefresh && this.holdings.length > 0) return;
       this.isLoading = true;
       this.errorMessage = null;
       try {
@@ -73,7 +74,7 @@ export const usePortfolioStore = defineStore('portfolio', {
         if (data && Array.isArray(data)) {
           data.forEach((p: any) => {
             const idx = this.holdings.findIndex(h => h.shcode === p.shcode);
-            if (idx !== -1) {
+            if (idx !== -1 && this.holdings[idx]) {
               const h = this.holdings[idx];
               h.currentPrice = p.currentPrice;
               h.targetPrice = p.targetPrice;

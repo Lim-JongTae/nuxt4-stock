@@ -150,12 +150,8 @@ function downloadActiveReport() {
 
 onMounted(async () => {
   stockDetailStore.initFromStorage();
-  screenerStore.initFromStorage();
-  await portfolioStore.fetchHoldings();
-
-  if (!screenerStore.newData || screenerStore.newData.length === 0) {
-    await screenerStore.refreshScreener();
-  }
+  await screenerStore.loadInitial(false);
+  await portfolioStore.fetchHoldings(false);
 
   const firstStock = screenerStore.newData?.[0];
   if (firstStock) {

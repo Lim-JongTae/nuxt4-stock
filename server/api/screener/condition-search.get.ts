@@ -103,28 +103,37 @@ export default defineEventHandler(async (event) => {
       // t1102 시세
       const priceData = await fetchLSPrice(token, cleanCode);
       // t1305 65일 일봉
-      const candles = await fetchLST1305Prices(token, cleanCode, 65);
-      const tech = calculateTechnicalIndicators(candles, priceData?.closePrice || 0);
+      const candles = await fetchLST1305Prices(token, cleanCode, priceData);
+      const tech = calculateTechnicalIndicators(candles);
 
       // t1927 공매도
-      const shortRecords = await fetchLSShortSellTrend(token, cleanCode, 5);
-      const shortSignal = classifyShortSellSignal(shortRecords, priceData?.closePrice || 0);
+      const shortRecords = await fetchLSShortSellTrend(token, cleanCode, priceData);
+      const isEtfOrForeign = cleanCode.startsWith('US') || (stock.name || '').includes('ETF') || (stock.name || '').includes('KODEX');
+      const shortSignal = classifyShortSellSignal(shortRecords || [], isEtfOrForeign);
 
-      // 퀀트 점수 산출 (최대 100점)
+      const closePrice = priceData || (candles && candles.size > 0 ? Array.from(candles.values())[0]?.close : 0) || 0;
+
+      // 8대 조건 검사 & 퀀트 점수 산출
+      const isBbLowerSupport = typeof tech.bbLower === 'number' && tech.bbLower > 0 && closePrice > 0 && closePrice <= Math.round(tech.bbLower * 1.02);
+      const isMaGoldenCross = typeof tech.ma5 === 'number' && typeof tech.ma20 === 'number' && typeof tech.ma60 === 'number' &&
+                            tech.ma5 > 0 && tech.ma20 > 0 && tech.ma60 > 0 && tech.ma5 >= tech.ma20 && tech.ma20 >= tech.ma60;
+      const isVolumeSpike = typeof tech.volumeRatio === 'number' && tech.volumeRatio >= 120.0;
+      const isShortSignalValid = shortSignal.label === "숏커버링(환매수) 유력" || shortSignal.label === "매수세가 공매도 흡수 중";
+
       let score = 0;
-      if (tech.psy !== null && tech.psy <= 25) score += 20;
-      if (tech.rsi !== null && tech.rsi <= 30) score += 20;
-      if (tech.isBbLowerSupport) score += 15;
-      if (tech.isMaGoldenCross) score += 15;
-      if (tech.isVolumeSpike) score += 15;
-      if (shortSignal.signalType.includes('SHORT_COVERING') || shortSignal.signalType.includes('SHORT_REDUCE')) score += 15;
+      if (typeof tech.psy === 'number' && tech.psy <= 25) score += 20;
+      if (typeof tech.rsi === 'number' && tech.rsi <= 35) score += 20;
+      if (isBbLowerSupport) score += 15;
+      if (isMaGoldenCross) score += 15;
+      if (isVolumeSpike) score += 15;
+      if (isShortSignalValid) score += 15;
 
       processedResults.push({
         shcode: shcodeWithPrefix,
-        name: priceData?.name || stock.name || cleanCode,
+        name: stock.name || cleanCode,
         industry: '조건검색 발굴',
-        closePrice: priceData?.closePrice || 0,
-        changeRate: priceData?.changeRate || 0,
+        closePrice: closePrice,
+        changeRate: 0,
         score,
         psy: tech.psy,
         rsi: tech.rsi,
@@ -133,7 +142,7 @@ export default defineEventHandler(async (event) => {
         ma20: tech.ma20,
         volumeRatio: tech.volumeRatio,
         macdHist: tech.macdHist,
-        shortSellingStatus: shortSignal.signalType,
+        shortSellingStatus: shortSignal.label,
         shortSignalSummary: shortSignal.summary,
         isFullyMatched: score >= 85
       });

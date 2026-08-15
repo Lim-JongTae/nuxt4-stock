@@ -1,7 +1,7 @@
 import { db } from '../../db';
 import { screenerHistory, stocks } from '../../db/schema';
 import { desc } from 'drizzle-orm';
-import { loadEnv, getLSToken, fetchLSPrice, fetchLSShortSellTrend } from '../../utils/lsApi';
+import { loadEnv, getLSToken, fetchLSPrice, fetchLSShortSellTrend, fetchLSMarketBasis } from '../../utils/lsApi';
 import { classifyShortSellSignal, type ShortSellRecord } from '../../utils/shortSellSignal';
 
 export default defineEventHandler(async (event) => {
@@ -10,6 +10,7 @@ export default defineEventHandler(async (event) => {
   const appSecret = env.LS_SECREAT || '';
 
   const { token, error: tokenError } = await getLSToken(appKey, appSecret);
+  const marketBasis = await fetchLSMarketBasis(token || '');
 
   // 1. SQLite DB (stocks 테이블)에서 보유종목 + 관심종목 동적 로드
   const dbStocks = await db.select().from(stocks);
@@ -212,10 +213,11 @@ export default defineEventHandler(async (event) => {
     success: true,
     timestamp: localTime,
     source: token
-      ? (priceFailCount > 0 ? `LS증권 Open API (t1102/t8413/t1927 부분 수신)` : 'LS증권 Open API (openapi.ls-sec.co.kr - t1102/t8413/t1927)')
+      ? (priceFailCount > 0 ? `LS증권 Open API (t1102/t1305/t1927/t2111 부분 수신)` : 'LS증권 Open API (openapi.ls-sec.co.kr - t1102/t1305/t1927/t2111)')
       : `LS증권 DB 데이터 (${apiCallNote})`,
     error: priceFailCount > 0 ? apiCallNote : (tokenError || null),
     oldData,
-    newData: newBatch
+    newData: newBatch,
+    marketBasis
   };
 });

@@ -1,20 +1,8 @@
 import { defineEventHandler, readBody, createError } from 'h3';
 import { loadEnv } from '../../utils/lsApi';
 
-export interface AnthropicApiRequest {
-  prompt: string;
-  system?: string;
-  model?: string;
-  temperature?: number;
-  maxTokens?: number;
-}
-
-export interface AnthropicApiResponse {
-  success: boolean;
-  content: string;
-  model: string;
-  usage?: any;
-}
+import type { AnthropicApiRequest, AnthropicApiResponse } from '../../../utils/types/claudeApi';
+export type { AnthropicApiRequest, AnthropicApiResponse };
 
 export default defineEventHandler(async (event): Promise<AnthropicApiResponse> => {
   const body: AnthropicApiRequest = await readBody(event);

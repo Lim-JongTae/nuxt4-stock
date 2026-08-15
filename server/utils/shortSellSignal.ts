@@ -1,23 +1,6 @@
-export interface ShortSellRecord {
-  date: string;
-  balanceRatio: number; // 잔고비율 (%)
-  price: number;        // 주가 종가 (원)
-  shortAvgPrice?: number; // 공매도 평균체결가 (원)
-  shortVolume?: number;   // 공매도 체결/매도 수량 (주)
-  changeRate?: number;    // 주가 등락율 (%)
-  volume: number;       // 총 누적 거래량
-}
+import type { ShortSellRecord, ShortSellSignalResult } from '../../utils/types/lsSecurities';
 
-export interface ShortSellSignalResult {
-  label: "신규 공매도 유입" | "숏커버링(환매수) 유력" | "매수세가 공매도 흡수 중" | "판단 보류" | "신호 분류 불가";
-  confidence: "높음" | "중간" | "낮음";
-  metrics: {
-    balanceRatioDiff: number; // 5일간 잔고비율 변화 (%p)
-    priceDiffRate: number;    // 5일간 주가 변화율 (%)
-    volumeDiffRate: number;   // 5일 평균 대비 거래량 변화율 (%)
-  } | null;
-  summary: string;
-}
+export type { ShortSellRecord, ShortSellSignalResult };
 
 /**
  * 최근 5일치(또는 2일 이상) 공매도 시계열 데이터로 5일 누적 추세(잔고비율 %p, 주가 %, 거래량 %)를 계산하여

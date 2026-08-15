@@ -26,7 +26,7 @@
         <button 
           @click="portfolioStore.refreshPrices()" 
           :disabled="portfolioStore.isLoading"
-          class="px-4 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-500/20 flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+          class="px-4 py-2.5 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-500/20 flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
         >
           <i class="fas" :class="portfolioStore.isLoading ? 'fa-spinner fa-spin' : 'fa-sync-alt'"></i>
           <span>{{ portfolioStore.isLoading ? 'LS증권 시세 갱신 중...' : 'LS증권 실시간 시세 갱신' }}</span>
@@ -87,21 +87,21 @@
                 {{ Number(item.currentPrice).toLocaleString() }}원
               </td>
               
-              <!-- PnL Rate (Red for profit/up, Green for loss/down) -->
-              <td class="px-4 py-3.5 font-mono font-extrabold" :class="getPnl(item).rate >= 0 ? 'text-rose-400' : 'text-emerald-400'">
+              <!-- PnL Rate (양수: 붉은색, 음수: 푸른색/Cyan) -->
+              <td class="px-4 py-3.5 font-mono font-extrabold" :class="getPnl(item).rate >= 0 ? 'text-rose-400' : 'text-cyan-400'">
                 {{ getPnl(item).rate >= 0 ? '+' : '' }}{{ getPnl(item).rate }}%
               </td>
 
               <!-- Dynamic Tech & AI Protection Guidelines -->
               <td class="px-4 py-3.5 text-[11px] space-y-0.5">
                 <div class="text-rose-400">
-                  💰 목표가: <strong>{{ (item.targetPrice || Math.round(item.currentPrice * 1.075)).toLocaleString() }}원 ({{ (((item.targetPrice || Math.round(item.currentPrice * 1.075)) - item.currentPrice) / item.currentPrice * 100).toFixed(1) >= 0 ? '+' : '' }}{{ (((item.targetPrice || Math.round(item.currentPrice * 1.075)) - item.currentPrice) / item.currentPrice * 100).toFixed(1) }}%)</strong>
+                  💰 목표가: <strong>{{ getTargetPriceInfo(item).price.toLocaleString() }}원 ({{ getTargetPriceInfo(item).rate }}%)</strong>
                 </div>
                 <div class="text-amber-400">
                   🛡️ 트레일링: <strong>고점 대비 -{{ item.trailingRate || 2.5 }}%</strong>
                 </div>
-                <div class="text-emerald-400">
-                  🚨 손절가: <strong>{{ (item.stopLossPrice || Math.round(item.currentPrice * 0.95)).toLocaleString() }}원 ({{ (((item.stopLossPrice || Math.round(item.currentPrice * 0.95)) - item.currentPrice) / item.currentPrice * 100).toFixed(1) }}%)</strong>
+                <div class="text-cyan-400">
+                  🚨 손절가: <strong>{{ getStopLossInfo(item).price.toLocaleString() }}원 ({{ getStopLossInfo(item).rate }}%)</strong>
                 </div>
               </td>
 
@@ -198,13 +198,31 @@ const aiReportTimestamp = ref('');
 const isCopied = ref(false);
 
 onMounted(async () => {
-  await portfolioStore.fetchHoldings();
+  await portfolioStore.fetchHoldings(false);
 });
 
 function getPnl(item: HoldingItem) {
   const pnlAmount = (item.currentPrice - item.avgPrice) * item.quantity;
   const rate = Math.round((pnlAmount / (item.avgPrice * item.quantity)) * 1000) / 10;
   return { amount: pnlAmount, rate };
+}
+
+function getTargetPriceInfo(item: HoldingItem) {
+  const currentPrice = item.currentPrice || 0;
+  const targetPrice = item.targetPrice || Math.round(currentPrice * 1.075);
+  if (!currentPrice) return { price: 0, rate: '0.0' };
+  const diffRate = (((targetPrice - currentPrice) / currentPrice) * 100).toFixed(1);
+  const sign = Number(diffRate) >= 0 ? '+' : '';
+  return { price: targetPrice, rate: `${sign}${diffRate}` };
+}
+
+function getStopLossInfo(item: HoldingItem) {
+  const currentPrice = item.currentPrice || 0;
+  const stopLossPrice = item.stopLossPrice || Math.round(currentPrice * 0.95);
+  if (!currentPrice) return { price: 0, rate: '0.0' };
+  const diffRate = (((stopLossPrice - currentPrice) / currentPrice) * 100).toFixed(1);
+  const sign = Number(diffRate) >= 0 ? '+' : '';
+  return { price: stopLossPrice, rate: `${sign}${diffRate}` };
 }
 
 function openAiModal(stockName: string) {

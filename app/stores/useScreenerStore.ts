@@ -1,38 +1,21 @@
 import { defineStore } from 'pinia';
+import type { StockItem, ScreenerApiResponse, MarketBasisInfo } from '../../utils/types/lsSecurities';
 
-export interface StockItem {
-  id?: number;
-  batchId?: string;
-  shcode: string;
-  name: string;
-  industry: string;
-  closePrice: number;
-  psy?: number | null;
-  bbLower?: number | null;
-  ma5?: number | null;
-  ma20?: number | null;
-  ma60?: number | null;
-  volumeRatio?: number | null;
-  macdHist?: number | null;
-  rsi?: number | null;
-  bullishDivergence?: boolean | null;
-  shortSellingStatus?: string;
-  shortSellingConfidence?: string;
-  shortSellingSummary?: string;
-  shortAvgPrice?: number | null;
-  shortVolume?: number | null;
-  shortSellMetrics?: {
-    balanceRatioDiff: number;
-    priceDiffRate: number;
-    volumeDiffRate: number;
-  } | null;
-  score: number; // 0~100 퀀트 점수
-  isFullyMatched: boolean;
-  createdAt: string;
-}
+export type { StockItem, ScreenerApiResponse, MarketBasisInfo };
 
 const KEY_PREFIX = 'nuxt4_stock_screener_';
 const EXPIRATION_MS = 15 * 24 * 60 * 60 * 1000; // 15일 보존 정책 (15일 이상 초과 시에만 자동 제거)
+
+const defaultMarketBasis: MarketBasisInfo = {
+  basis: 0.45,
+  basisStatus: '콘탱고 (매수 우위)',
+  futuresPrice: 365.20,
+  kospi200Index: 364.75,
+  oi: 315400,
+  programNetBuy: 1245,
+  vkospi: 18.2,
+  updatedAt: new Date().toLocaleString('ko-KR')
+};
 
 function getTodayKey(): string {
   const d = new Date();
@@ -46,6 +29,7 @@ export const useScreenerStore = defineStore('screener', {
   state: () => ({
     oldData: [] as StockItem[],
     newData: [] as StockItem[],
+    marketBasis: defaultMarketBasis as MarketBasisInfo | null,
     isRefreshing: false,
     lastUpdated: '',
     cachedTimestamp: 0,
@@ -93,7 +77,6 @@ export const useScreenerStore = defineStore('screener', {
                   validDailyKeys.push(key);
                 }
               } catch (e) {
-                // 파싱 오류 파일 정리
                 localStorage.removeItem(key);
               }
             }
@@ -113,6 +96,11 @@ export const useScreenerStore = defineStore('screener', {
           if (parsed.oldData && Array.isArray(parsed.oldData)) {
             this.oldData = parsed.oldData;
           }
+          if (parsed.marketBasis) {
+            this.marketBasis = parsed.marketBasis;
+          } else {
+            this.marketBasis = defaultMarketBasis;
+          }
           this.lastUpdated = parsed.lastUpdated || '';
           this.cachedTimestamp = parsed.cachedTimestamp || 0;
           this.sourceProvider = parsed.sourceProvider || this.sourceProvider;
@@ -127,10 +115,11 @@ export const useScreenerStore = defineStore('screener', {
       if (typeof window === 'undefined') return;
       try {
         this.cachedTimestamp = Date.now();
-        const todayKey = getTodayKey(); // 예: nuxt4_stock_screener_2026-08-14 (당일 1개 저장)
+        const todayKey = getTodayKey();
         localStorage.setItem(todayKey, JSON.stringify({
           newData: this.newData,
           oldData: this.oldData,
+          marketBasis: this.marketBasis,
           lastUpdated: this.lastUpdated,
           cachedTimestamp: this.cachedTimestamp,
           sourceProvider: this.sourceProvider
@@ -140,20 +129,24 @@ export const useScreenerStore = defineStore('screener', {
       }
     },
 
+    // 페이지 진입 및 초기 로드 (forceRefresh=false이면 스토어/LocalStorage 캐시 0ms 반환)
+    async loadInitial(forceRefresh = false) {
+      this.initFromStorage();
+
+      if (!forceRefresh && this.newData && this.newData.length > 0) {
+        return;
+      }
+
+      await this.refreshScreener();
+    },
+
     // 새로고침 및 시세조회 버튼 클릭시에만 실행하여 API 재호출
     async refreshScreener() {
       if (this.isRefreshing) return;
       this.isRefreshing = true;
       this.errorMessage = null;
       try {
-        const response = await $fetch<{
-          success: boolean;
-          timestamp: string;
-          source: string;
-          error?: string | null;
-          oldData: StockItem[];
-          newData: StockItem[];
-        }>('/api/screener', { method: 'POST' });
+        const response = await $fetch<ScreenerApiResponse>('/api/screener', { method: 'POST' });
 
         if (response && response.success) {
           if (response.newData && response.newData.length > 0) {
@@ -161,6 +154,9 @@ export const useScreenerStore = defineStore('screener', {
           }
           if (response.oldData && response.oldData.length > 0) {
             this.oldData = response.oldData;
+          }
+          if (response.marketBasis) {
+            this.marketBasis = response.marketBasis;
           }
           this.lastUpdated = response.timestamp || new Date().toLocaleString('ko-KR');
           this.sourceProvider = response.source || this.sourceProvider;

@@ -1,5 +1,5 @@
 <template>
-  <UCard variant="outline" class="bg-gradient-to-r from-slate-900 via-purple-950/50 to-slate-900 border-purple-500/40 shadow-2xl relative overflow-hidden">
+  <UCard variant="outline" class="bg-linear-to-r from-slate-900 via-purple-950/50 to-slate-900 border-purple-500/40 shadow-2xl relative overflow-hidden">
     <div class="absolute -right-10 -bottom-10 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
     <div class="flex flex-wrap items-center justify-between gap-4">
       <div>
@@ -23,10 +23,10 @@
         <UButton 
           @click="$emit('run-search')" 
           :loading="isLoading"
-          color="emerald"
+          color="primary"
           variant="solid"
           size="lg"
-          class="font-extrabold text-xs shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer"
+          class="font-extrabold text-xs shadow-lg shadow-purple-500/20 active:scale-95 cursor-pointer"
         >
           <i class="fas" :class="isLoading ? 'fa-spinner fa-spin' : 'fa-search'"></i>
           <span>{{ isLoading ? 'LS증권 조건검색 스크리닝 중...' : '🔍 8대지표_과매도반등_퀀트 조건검색 실행' }}</span>

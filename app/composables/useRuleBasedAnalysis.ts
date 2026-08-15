@@ -1,72 +1,26 @@
-import { defineEventHandler, readBody, createError } from 'h3';
+import type { AIAnalysisRequest, AIAnalysisResponse } from '../../utils/types/claudeApi';
+import { useStockDetailStore } from '../stores/useStockDetailStore';
 
-export interface AIAnalysisRequest {
-  shcode: string;
-  name: string;
-  industry: string;
-  closePrice: number;
-  isHolding: boolean;
-  holdingQuantity?: number;
-  holdingAvgPrice?: number;
-  score: number;
-  isFullyMatched: boolean;
-  conditions: Record<string, boolean>;
-  shortSignalLabel: string;
-  shortSignalConfidence: string;
-  shortSignalSummary: string;
-  psy?: number | null;
-  rsi?: number | null;
-  macdHist?: number | null;
-  volumeRatio?: number | null;
-}
-
-export interface AIAnalysisResponse {
-  decision: "매도" | "유지" | "매수" | "관찰";
-  badgeClass: string;
-  confidence: "높음" | "중간" | "낮음";
-  targetPrice: number;
-  stopLossPrice: number;
-  expectedReturnRate: number;
-  summary: string;
-  keyReasons: string[];
-  riskFactor: string;
-  actionPlan: string;
-  analyzedAt: string;
-}
-
-export default defineEventHandler(async (event) => {
-  const body: AIAnalysisRequest = await readBody(event);
-
-  if (!body || !body.shcode) {
-    throw createError({
-      statusCode: 400,
-      statusMessage: '분석할 종목 데이터가 제공되지 않았습니다.'
-    });
-  }
-
+/**
+ * 8대 기술적 지표 및 공매도 수급 기반 룰 기반(Rule-Based) 종목 매매 진단 순수 비즈니스 계산 함수
+ */
+export function evaluateRuleBasedStockAnalysis(data: AIAnalysisRequest): AIAnalysisResponse {
   const {
-    shcode,
     name,
-    industry,
     closePrice,
     isHolding,
     holdingAvgPrice,
     score,
     isFullyMatched,
     shortSignalLabel,
-    shortSignalConfidence,
     psy,
     rsi,
-    macdHist,
     volumeRatio
-  } = body;
+  } = data;
 
   const now = new Date();
   const analyzedAt = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-  // 보유 여부에 따른 4가지 분기 로직:
-  // 보유 시 -> [매도] vs [유지]
-  // 미보유 시 -> [매수] vs [관찰]
   let decision: "매도" | "유지" | "매수" | "관찰" = "관찰";
   let badgeClass = "bg-slate-800 text-slate-300 border-slate-700";
   let confidence: "높음" | "중간" | "낮음" = "중간";
@@ -112,11 +66,11 @@ export default defineEventHandler(async (event) => {
       keyReasons.push(`8대 지표 점수 ${score}점으로 단기 정배열 및 과매도 탈출 지속`);
 
       riskFactor = "단기 상단 저항선 돌파 실패 시 박스권 지루한 흐름 가능성";
-      actionPlan = `목표가 ${targetPrice.toLocaleString()}원 도달 시 익절 실행, 손절가 ${stopLossPrice.toLocaleString()}원 ই탈 전까지 지속 홀딩`;
+      actionPlan = `목표가 ${targetPrice.toLocaleString()}원 도달 시 익절 실행, 손절가 ${stopLossPrice.toLocaleString()}원 이탈 전까지 지속 홀딩`;
     }
   } else {
     // === [미보유 관심종목 케이스] ===
-    // 매수 조건: 퀀트 점수 85점 이상 또는 완전 매칭 또는 숏커버링 유력
+    // 매수 조건: 퀀트 점수 80점 이상 또는 완전 매칭 또는 숏커버링 유력
     if (isFullyMatched || score >= 80 || shortSignalLabel === "숏커버링(환매수) 유력" || shortSignalLabel === "매수세가 공매도 흡수 중") {
       decision = "매수";
       badgeClass = "bg-emerald-500/20 text-emerald-300 border-emerald-500/50 shadow-emerald-950/50 shadow-lg";
@@ -152,19 +106,80 @@ export default defineEventHandler(async (event) => {
   const expectedReturnRate = Number((((targetPrice - closePrice) / closePrice) * 100).toFixed(1));
 
   return {
-    success: true,
-    data: {
-      decision,
-      badgeClass,
-      confidence,
-      targetPrice,
-      stopLossPrice,
-      expectedReturnRate,
-      summary,
-      keyReasons,
-      riskFactor,
-      actionPlan,
-      analyzedAt
-    } as AIAnalysisResponse
+    decision,
+    badgeClass,
+    confidence,
+    targetPrice,
+    stopLossPrice,
+    expectedReturnRate,
+    summary,
+    keyReasons,
+    riskFactor,
+    actionPlan,
+    analyzedAt
   };
-});
+}
+
+/**
+ * 사용자 원칙 적용 Composable
+ * 
+ * 1. API: 외부(LS증권/DB)에서 순수 데이터만 수신하여 반환
+ * 2. 비즈니스 로직(Composable):
+ *    - 평상시: Pinia Store(및 15일 LocalStorage)에서 자료를 가져와 무의미한 외부 토큰/API 호출 방지
+ *    - 새로고침/갱신 요청 시: 외부 데이터 수집 API(/api/stock/[shcode])를 호출하여 신규 자료 가져옴
+ *    - 가져온 자료를 비즈니스 로직에서 계산 후 View 화면에 표기
+ */
+export function useRuleBasedAnalysis() {
+  const detailStore = useStockDetailStore();
+
+  /**
+   * 종목 퀀트 매매 진단 비즈니스 로직 함수
+   * @param shcode 종목코드
+   * @param forceRefresh 사용자가 새로고침 등을 요구하여 API 호출이 필요한지 여부 (기본값: false)
+   */
+  async function analyzeStock(shcode: string, forceRefresh = false): Promise<AIAnalysisResponse | null> {
+    const cleanCode = String(shcode).trim().replace(/^A/i, '');
+    let stockData = null;
+
+    // 1. 무의미한 외부 토큰/API 호출을 줄이기 위해 Pinia Store에서 먼저 자료를 읽음
+    if (!forceRefresh) {
+      stockData = detailStore.getStockCache(cleanCode);
+    }
+
+    // 2. 캐시가 없거나, 사용자가 새로고침(forceRefresh)을 요청한 경우에만 외부 통신 API 호출!
+    if (!stockData || forceRefresh) {
+      stockData = await detailStore.fetchAndCacheStock(cleanCode); // 외부 시세 수집 API 호출
+    }
+
+    if (!stockData) return null;
+
+    // 3. API 또는 Store에서 가져온 자료(변수)를 받아서 비즈니스 로직에서 계산 수행
+    const requestPayload: AIAnalysisRequest = {
+      shcode: stockData.shcode,
+      name: stockData.name,
+      industry: stockData.industry,
+      closePrice: stockData.closePrice,
+      isHolding: stockData.isHolding,
+      holdingQuantity: stockData.holdingQuantity,
+      holdingAvgPrice: stockData.holdingAvgPrice,
+      score: stockData.score,
+      isFullyMatched: stockData.isFullyMatched,
+      conditions: stockData.conditions || {},
+      shortSignalLabel: stockData.shortSignal?.label || '신호 분류 불가',
+      shortSignalConfidence: stockData.shortSignal?.confidence || '낮음',
+      shortSignalSummary: stockData.shortSignal?.summary || '',
+      psy: stockData.psy,
+      rsi: stockData.rsi,
+      macdHist: stockData.macdHist,
+      volumeRatio: stockData.volumeRatio
+    };
+
+    // 4. 계산된 결과를 View 화면으로 전달
+    return evaluateRuleBasedStockAnalysis(requestPayload);
+  }
+
+  return {
+    analyzeStock,
+    evaluateRuleBasedStockAnalysis
+  };
+}

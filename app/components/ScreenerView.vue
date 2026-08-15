@@ -19,7 +19,7 @@
         </div>
 
         <button 
-          @click="screenerStore.refreshScreener()" 
+          @click="screenerStore.loadInitial(true)" 
           :disabled="screenerStore.isRefreshing"
           class="px-5 py-2.5 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-500/20 flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
         >
@@ -89,9 +89,71 @@
         <div class="bg-slate-950/70 border border-indigo-500/30 p-2 rounded-xl space-y-1">
           <div class="text-[11px] font-bold text-indigo-400 flex items-center justify-between">
             <span>8. 시장 방향성</span>
-            <span class="px-1 py-0.5 rounded bg-indigo-500/20 text-[9px]">t2111/t2424</span>
+            <span 
+              class="px-1 py-0.5 rounded text-[9px] font-mono font-bold"
+              :class="screenerStore.marketBasis && screenerStore.marketBasis.basis >= 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'"
+            >
+              {{ screenerStore.marketBasis ? (screenerStore.marketBasis.basis >= 0 ? '+' : '') + screenerStore.marketBasis.basis + 'pt' : 't2111' }}
+            </span>
           </div>
-          <p class="text-[10px] text-slate-400">베이시스/OI/프로그램</p>
+          <p class="text-[10px] text-slate-300 font-semibold truncate">
+            {{ screenerStore.marketBasis ? screenerStore.marketBasis.basisStatus : '베이시스/OI/프로그램' }}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dedicated LS Securities Market Basis & Futures Direction Summary Banner -->
+    <div class="bg-linear-to-r from-slate-900 via-indigo-950/60 to-slate-900 border border-indigo-500/40 rounded-2xl p-4 shadow-xl flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-400 flex items-center justify-center shrink-0 shadow-inner">
+          <i class="fas fa-chart-line text-lg"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2.5">
+            <h4 class="text-xs font-extrabold text-white flex items-center gap-1.5">
+              <span>LS증권 KOSPI200 선물 시장 베이시스</span>
+              <span class="text-[10px] text-indigo-400 font-mono font-normal bg-indigo-950 px-2 py-0.5 rounded border border-indigo-800">t2111 / t2424</span>
+            </h4>
+            <template v-if="screenerStore.marketBasis">
+              <span 
+                class="px-2.5 py-0.5 rounded-md text-[11px] font-extrabold flex items-center gap-1 border shadow-xs"
+                :class="screenerStore.marketBasis.basis >= 0 ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' : 'bg-rose-500/20 text-rose-400 border-rose-500/40'"
+              >
+                <i class="fas" :class="screenerStore.marketBasis.basis >= 0 ? 'fa-arrow-up text-emerald-400' : 'fa-arrow-down text-rose-400'"></i>
+                <span>{{ screenerStore.marketBasis.basis >= 0 ? '+' : '' }}{{ screenerStore.marketBasis.basis }}pt</span>
+                <span class="text-[10px] font-bold opacity-90">({{ screenerStore.marketBasis.basisStatus }})</span>
+              </span>
+            </template>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-0.5">
+            KOSPI200 선물과 현물 지수의 수급 격차를 실시간 측정하여 증시 전체 프로그램 매수/매도 우위를 판단합니다.
+          </p>
+        </div>
+      </div>
+
+      <div v-if="screenerStore.marketBasis" class="flex flex-wrap items-center gap-3 text-xs">
+        <div class="bg-slate-950/90 border border-slate-800 px-3 py-1.5 rounded-xl font-mono shadow-inner">
+          <span class="text-slate-400 text-[10px] block font-semibold">선물 현재가</span>
+          <strong class="text-white text-xs">{{ screenerStore.marketBasis.futuresPrice }}pt</strong>
+        </div>
+        <div class="bg-slate-950/90 border border-slate-800 px-3 py-1.5 rounded-xl font-mono shadow-inner">
+          <span class="text-slate-400 text-[10px] block font-semibold">현물 지수</span>
+          <strong class="text-white text-xs">{{ screenerStore.marketBasis.kospi200Index }}pt</strong>
+        </div>
+        <div class="bg-slate-950/90 border border-slate-800 px-3 py-1.5 rounded-xl font-mono shadow-inner">
+          <span class="text-slate-400 text-[10px] block font-semibold">미결제약정 (OI)</span>
+          <strong class="text-cyan-400 text-xs">{{ Number(screenerStore.marketBasis.oi).toLocaleString() }}계약</strong>
+        </div>
+        <div class="bg-slate-950/90 border border-slate-800 px-3 py-1.5 rounded-xl font-mono shadow-inner">
+          <span class="text-slate-400 text-[10px] block font-semibold">프로그램 순매수</span>
+          <strong :class="screenerStore.marketBasis.programNetBuy >= 0 ? 'text-rose-400' : 'text-cyan-400'" class="text-xs">
+            {{ screenerStore.marketBasis.programNetBuy >= 0 ? '+' : '' }}{{ Number(screenerStore.marketBasis.programNetBuy).toLocaleString() }}억원
+          </strong>
+        </div>
+        <div class="bg-slate-950/90 border border-slate-800 px-3 py-1.5 rounded-xl font-mono shadow-inner">
+          <span class="text-slate-400 text-[10px] block font-semibold">VKOSPI 변동성</span>
+          <strong class="text-amber-400 text-xs">{{ screenerStore.marketBasis.vkospi }}</strong>
         </div>
       </div>
     </div>
@@ -144,7 +206,6 @@
                 <th class="px-3 py-3">MACD</th>
                 <th class="px-3 py-3">RSI(14일)</th>
                 <th class="px-3 py-3">공매도 분석 (t1927)</th>
-                <th class="px-3 py-3">시장 베이시스 (t2111)</th>
                 <th class="px-3 py-3 text-center">8대 지표 퀀트 스코어</th>
               </tr>
             </thead>
@@ -220,9 +281,6 @@
                       <span>매도량: {{ Number(item.shortVolume).toLocaleString() }}주</span>
                     </div>
                   </div>
-                </td>
-                <td class="px-3 py-3 text-indigo-400 font-semibold text-[11px]">
-                  LS증권 라이브 수급
                 </td>
                 
                 <td class="px-3 py-3 text-center">
@@ -348,9 +406,7 @@ import { useScreenerStore, type StockItem } from '~/stores/useScreenerStore';
 const screenerStore = useScreenerStore();
 
 onMounted(async () => {
-  screenerStore.initFromStorage();
-  // 항상 또는 데이터가 없거나 갱신 필요 시 LS증권 API 실시간 시세 갱신
-  await screenerStore.refreshScreener();
+  await screenerStore.loadInitial(false);
 });
 
 function getPriceDelta(newItem: StockItem) {
@@ -361,7 +417,7 @@ function getPriceDelta(newItem: StockItem) {
   if (diff > 0) {
     return { text: `▲ +${diff.toLocaleString()}원`, class: 'text-rose-400' };
   } else if (diff < 0) {
-    return { text: `▼ ${diff.toLocaleString()}원`, class: 'text-emerald-400' };
+    return { text: `▼ ${diff.toLocaleString()}원`, class: 'text-cyan-400' };
   } else {
     return { text: `(= 변동없음)`, class: 'text-slate-400' };
   }

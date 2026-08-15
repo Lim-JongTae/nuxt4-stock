@@ -14,7 +14,7 @@ export default defineEventHandler(async (event) => {
 
   try {
     const existing = await db.select().from(stocks).where(eq(stocks.shcode, targetCode));
-    const stockName = existing.length > 0 ? existing[0].name : targetCode;
+    const stockName = existing[0]?.name || targetCode;
 
     await db.delete(stocks).where(eq(stocks.shcode, targetCode));
 
