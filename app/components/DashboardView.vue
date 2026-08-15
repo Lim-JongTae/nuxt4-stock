@@ -239,7 +239,12 @@
           </span>
         </div>
 
-        <div v-if="screenerStore.topBuyRecommendations.length === 0" class="text-center py-8 text-slate-500 text-xs">
+        <div v-if="screenerStore.isRefreshing" class="text-center py-8 text-slate-400 text-xs flex items-center justify-center gap-2">
+          <i class="fas fa-spinner fa-spin text-purple-400 text-sm"></i>
+          <span>LS증권 Open API 시세 및 퀀트 지표 분석 중입니다...</span>
+        </div>
+
+        <div v-else-if="screenerStore.topBuyRecommendations.length === 0" class="text-center py-8 text-slate-500 text-xs">
           분석 데이터가 존재하지 않습니다. 관심종목을 등록해 주세요.
         </div>
 

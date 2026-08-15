@@ -192,6 +192,9 @@ export interface StockItem {
   shcode: string;
   name: string;
   industry: string;
+  isHolding?: boolean;
+  quantity?: number;
+  avgPrice?: number;
   closePrice: number;
   psy?: number | null;
   bbLower?: number | null;
