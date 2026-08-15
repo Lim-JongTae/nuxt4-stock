@@ -577,19 +577,19 @@ export async function fetchLSSectorData(token: string): Promise<{
   bottomSectors: Array<{ code: string; name: string; rate: number }>;
 }> {
   const fallbackTop = [
-    { code: '001', name: '전기/전자', rate: 2.45 },
-    { code: '009', name: '기계', rate: 1.85 },
-    { code: '015', name: '의약품', rate: 1.42 },
-    { code: '003', name: '화학', rate: 0.98 },
-    { code: '018', name: '운수장비', rate: 0.75 }
+    { code: '020', name: '통신업', rate: 6.10 },
+    { code: '015', name: '운수장비', rate: 3.58 },
+    { code: '024', name: '보험업', rate: 3.47 },
+    { code: '005', name: '음식료업', rate: 3.10 },
+    { code: '013', name: '전기/전자', rate: 2.68 }
   ];
 
   const fallbackBottom = [
-    { code: '020', name: '종이/목재', rate: -1.85 },
-    { code: '022', name: '철강/금속', rate: -1.25 },
-    { code: '025', name: '건설업', rate: -0.95 },
-    { code: '027', name: '유통업', rate: -0.62 },
-    { code: '030', name: '섬유/의복', rate: -0.45 }
+    { code: '009', name: '의약품', rate: -0.52 },
+    { code: '011', name: '철강/금속', rate: -0.34 },
+    { code: '014', name: '의료정밀', rate: -0.32 },
+    { code: '006', name: '섬유/의복', rate: -0.14 },
+    { code: '018', name: '건설업', rate: 0.31 }
   ];
 
   if (!token) {
@@ -629,38 +629,68 @@ export async function fetchLSSectorData(token: string): Promise<{
             if (['종합', '코스피', '코스닥', '대형', '중형', '소형', '제조', 'KOSPI', 'KOSDAQ', '지수', '시장'].some(kw => clean.includes(kw))) {
               return null;
             }
-            if (clean.includes('전기') || clean.includes('전자')) return '전기/전자';
-            if (clean.includes('의약') || clean.includes('제약') || clean.includes('바이오')) return '의약품';
-            if (clean.includes('철강') || clean.includes('금속')) return '철강/금속';
-            if (clean.includes('종이') || clean.includes('목재')) return '종이/목재';
-            if (clean.includes('운수') || clean.includes('장비')) return '운수장비';
-            if (clean.includes('건설')) return '건설업';
-            if (clean.includes('유통')) return '유통업';
-            if (clean.includes('서비스')) return '서비스업';
-            if (clean.includes('기계')) return '기계';
-            if (clean.includes('화학')) return '화학';
+            if (clean === '전기전자') return '전기/전자';
+            if (clean === '철강금속') return '철강/금속';
+            if (clean === '종이목재') return '종이/목재';
+            if (clean === '섬유의복') return '섬유/의복';
+            if (clean === '전기가스업') return '전기가스';
             return clean;
           };
 
-          const parsedMap = new Map<string, { code: string; name: string; rate: number }>();
+          const validSectors: Array<{ code: string; name: string }> = [];
           rows.forEach((r: any) => {
             const rawName = String(r.hname || r.upname || '').trim();
             const name = sanitizeSectorName(rawName);
-            if (name) {
-              const code = String(r.upcode || r.code || '').trim();
-              const rawRate = parseFloat(String(r.rate || r.diff || r.chgrate || 0));
-              const rate = isNaN(rawRate) ? 0 : Math.round(rawRate * 100) / 100;
-              if (!parsedMap.has(name) || parsedMap.get(name)!.rate === 0) {
-                parsedMap.set(name, { code, name, rate });
-              }
+            const code = String(r.upcode || r.code || '').trim();
+            if (name && code) {
+              validSectors.push({ code, name });
             }
           });
 
-          const parsed = Array.from(parsedMap.values());
-          const topSectors = [...parsed].sort((a, b) => b.rate - a.rate).slice(0, 5);
-          const bottomSectors = [...parsed].sort((a, b) => a.rate - b.rate).slice(0, 5);
+          // t1531 TR을 통해 각 업종별 실시간 등락율(diff, sign) 병열 수집
+          const sectorPrices = await Promise.allSettled(
+            validSectors.map(async (sec) => {
+              try {
+                const t1531Res = await fetch(url, {
+                  method: 'POST',
+                  headers: {
+                    'content-type': 'application/json; charset=utf-8',
+                    'authorization': 'Bearer ' + token,
+                    'tr_cd': 't1531',
+                    'tr_cont': 'N'
+                  },
+                  body: JSON.stringify({
+                    t1531InBlock: { upcode: sec.code }
+                  }),
+                  signal: AbortSignal.timeout(3000)
+                });
 
-          if (topSectors.length >= 5 && bottomSectors.length >= 5) {
+                if (t1531Res.ok) {
+                  const t1531Data = await t1531Res.json();
+                  const block = t1531Data.t1531OutBlock || t1531Data;
+                  if (block) {
+                    const rawDiff = parseFloat(String(block.diff || block.chgrate || 0));
+                    const sign = String(block.sign || '').trim();
+                    const isNeg = sign === '4' || sign === '5' || sign === '-';
+                    const rate = isNeg ? -Math.abs(rawDiff) : Math.abs(rawDiff);
+                    return { code: sec.code, name: sec.name, rate };
+                  }
+                }
+              } catch (e) {}
+              return null;
+            })
+          );
+
+          const parsedList: Array<{ code: string; name: string; rate: number }> = [];
+          sectorPrices.forEach((res) => {
+            if (res.status === 'fulfilled' && res.value) {
+              parsedList.push(res.value);
+            }
+          });
+
+          if (parsedList.length >= 5) {
+            const topSectors = [...parsedList].sort((a, b) => b.rate - a.rate).slice(0, 5);
+            const bottomSectors = [...parsedList].sort((a, b) => a.rate - b.rate).slice(0, 5);
             return { topSectors, bottomSectors };
           }
         }

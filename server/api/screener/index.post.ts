@@ -237,13 +237,28 @@ export default defineEventHandler(async (event) => {
   let topSectors = (sectorData.topSectors || []).filter(s => s.name && !isMacroOrScale(s.name));
   let bottomSectors = (sectorData.bottomSectors || []).filter(s => s.name && !isMacroOrScale(s.name));
 
-  if ((topSectors.length < 5 || bottomSectors.length < 5) && newBatch.length > 0) {
+  const isAllZero = (list: typeof topSectors) => list.length === 0 || list.every(s => s.rate === 0);
+
+  if ((isAllZero(topSectors) || isAllZero(bottomSectors)) && newBatch.length > 0) {
+    const getStockRate = (s: StockItem): number => {
+      if (typeof s.changeRate === 'number' && !isNaN(s.changeRate) && s.changeRate !== 0) {
+        return s.changeRate;
+      }
+      if (s.shortSellMetrics && typeof s.shortSellMetrics.priceDiffRate === 'number' && s.shortSellMetrics.priceDiffRate !== 0) {
+        return s.shortSellMetrics.priceDiffRate;
+      }
+      if (s.closePrice > 0 && s.ma20 && s.ma20 > 0) {
+        return Math.round(((s.closePrice - s.ma20) / s.ma20) * 10000) / 100;
+      }
+      return 0;
+    };
+
     const sectorMap = new Map<string, { totalRate: number; count: number }>();
     newBatch.forEach(s => {
       const ind = normalizeSectorName(s.industry || '기타');
       if (!sectorMap.has(ind)) sectorMap.set(ind, { totalRate: 0, count: 0 });
       const entry = sectorMap.get(ind)!;
-      const r = typeof s.changeRate === 'number' ? s.changeRate : Math.round(((s.score - 50) / 10) * 100) / 100;
+      const r = getStockRate(s);
       entry.totalRate += r;
       entry.count += 1;
     });
@@ -254,8 +269,10 @@ export default defineEventHandler(async (event) => {
       rate: Math.round((val.totalRate / val.count) * 100) / 100
     }));
 
-    topSectors = [...parsedSectors].sort((a, b) => b.rate - a.rate).slice(0, 5);
-    bottomSectors = [...parsedSectors].sort((a, b) => a.rate - b.rate).slice(0, 5);
+    if (parsedSectors.length > 0) {
+      topSectors = [...parsedSectors].sort((a, b) => b.rate - a.rate).slice(0, 5);
+      bottomSectors = [...parsedSectors].sort((a, b) => a.rate - b.rate).slice(0, 5);
+    }
   }
 
   return {

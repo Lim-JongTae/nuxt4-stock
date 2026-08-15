@@ -137,22 +137,22 @@
         </div>
 
         <!-- LS Securities Real-time Bottom 5 Declining Sectors Bar -->
-        <div class="bg-slate-950/80 border border-emerald-500/30 p-3 rounded-xl space-y-2">
+        <div class="bg-slate-950/80 border border-blue-500/30 p-3 rounded-xl space-y-2">
           <div class="flex items-center justify-between">
-            <span class="text-[11px] font-bold text-emerald-300 flex items-center gap-1.5">
-              <i class="fas fa-arrow-trend-down text-indigo-300"></i> LS증권 실시간 하락/약세 5대 업종 (t8424 / t1531 파싱)
+            <span class="text-[11px] font-bold text-blue-300 flex items-center gap-1.5">
+              <i class="fas fa-arrow-trend-down text-blue-400"></i> LS증권 실시간 하락/약세 5대 업종 (t8424 / t1531 파싱)
             </span>
-            <span class="text-[10px] text-emerald-400 font-mono">실시간 하락률 순</span>
+            <span class="text-[10px] text-blue-400 font-mono">실시간 하락률 순</span>
           </div>
           <div class="flex flex-wrap items-center gap-1.5">
             <template v-if="screenerStore.bottomSectors && screenerStore.bottomSectors.length > 0">
               <span 
                 v-for="s in screenerStore.bottomSectors" 
                 :key="s.code" 
-                class="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-indigo-300 text-xs font-semibold flex items-center gap-1 shadow-xs"
+                class="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-200 text-xs font-semibold flex items-center gap-1 shadow-xs"
               >
                 <span>{{ s.name }}</span>
-                <span class="text-emerald-400 font-extrabold text-[11px] font-mono">{{ s.rate >= 0 ? '+' : '' }}{{ s.rate }}%</span>
+                <span class="font-extrabold text-[11px] font-mono" :class="s.rate < 0 ? 'text-blue-400' : (s.rate > 0 ? 'text-rose-400' : 'text-sky-400')">{{ s.rate >= 0 ? '+' : '' }}{{ s.rate }}%</span>
               </span>
             </template>
             <template v-else>

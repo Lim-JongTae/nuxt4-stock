@@ -3,35 +3,8 @@ import type { StockItem, ScreenerApiResponse, MarketBasisInfo, TopSectorInfo, Ai
 
 export type { StockItem, ScreenerApiResponse, MarketBasisInfo, TopSectorInfo, AiMarketAnalysisInfo };
 
-const KEY_PREFIX = 'nuxt4_stock_screener_';
+const KEY_PREFIX = 'nuxt_updown_screener_';
 const EXPIRATION_MS = 15 * 24 * 60 * 60 * 1000; // 15일 보존 정책
-
-const defaultMarketBasis: MarketBasisInfo = {
-  basis: 0.45,
-  basisStatus: '콘탱고 (매수 우위)',
-  futuresPrice: 365.20,
-  kospi200Index: 364.75,
-  oi: 315400,
-  programNetBuy: 1245,
-  vkospi: 18.2,
-  updatedAt: new Date().toLocaleString('ko-KR')
-};
-
-const defaultTopSectors: TopSectorInfo[] = [
-  { code: '001', name: '전기/전자', rate: 2.45 },
-  { code: '009', name: '기계', rate: 1.85 },
-  { code: '015', name: '의약품', rate: 1.42 },
-  { code: '003', name: '화학', rate: 0.98 },
-  { code: '018', name: '운수장비', rate: 0.75 }
-];
-
-const defaultBottomSectors: TopSectorInfo[] = [
-  { code: '020', name: '종이/목재', rate: -1.85 },
-  { code: '022', name: '철강/금속', rate: -1.25 },
-  { code: '025', name: '건설업', rate: -0.95 },
-  { code: '027', name: '유통업', rate: -0.62 },
-  { code: '030', name: '섬유/의복', rate: -0.45 }
-];
 
 function getTodayKey(): string {
   const d = new Date();
@@ -45,9 +18,9 @@ export const useScreenerStore = defineStore('screener', {
   state: () => ({
     oldData: [] as StockItem[],
     newData: [] as StockItem[],
-    marketBasis: defaultMarketBasis as MarketBasisInfo | null,
-    topSectors: defaultTopSectors as TopSectorInfo[],
-    bottomSectors: defaultBottomSectors as TopSectorInfo[],
+    marketBasis: null as MarketBasisInfo | null,
+    topSectors: [] as TopSectorInfo[],
+    bottomSectors: [] as TopSectorInfo[],
     aiMarketAnalysis: null as AiMarketAnalysisInfo | null,
     isRefreshing: false,
     isAiAnalyzing: false,
@@ -94,7 +67,7 @@ export const useScreenerStore = defineStore('screener', {
 
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
-          if (key && (key.startsWith(KEY_PREFIX) || key.startsWith('nuxt4_stock_screener_cache'))) {
+          if (key && (key.startsWith(KEY_PREFIX) || key.startsWith('ls_screener_data') || key.startsWith('nuxt4_stock_screener_cache'))) {
             const raw = localStorage.getItem(key);
             if (raw) {
               try {
@@ -125,27 +98,21 @@ export const useScreenerStore = defineStore('screener', {
           }
           if (parsed.marketBasis) {
             this.marketBasis = parsed.marketBasis;
-          } else {
-            this.marketBasis = defaultMarketBasis;
           }
           const isInvalidSectorList = (list: TopSectorInfo[]) => {
             if (!list || !Array.isArray(list) || list.length === 0) return true;
             return list.some(s => {
               if (!s.name) return true;
               const clean = s.name.replace(/\s+/g, '');
-              return ['대형', '중형', '소형', '종합', '코스피', '코스닥', '제조', '음식료'].some(m => clean.includes(m));
+              return ['대형', '중형', '소형', '종합', '코스피', '코스닥', '제조업'].some(m => clean.includes(m));
             });
           };
 
           if (parsed.topSectors && Array.isArray(parsed.topSectors) && !isInvalidSectorList(parsed.topSectors)) {
             this.topSectors = parsed.topSectors;
-          } else {
-            this.topSectors = defaultTopSectors;
           }
           if (parsed.bottomSectors && Array.isArray(parsed.bottomSectors) && !isInvalidSectorList(parsed.bottomSectors)) {
             this.bottomSectors = parsed.bottomSectors;
-          } else {
-            this.bottomSectors = defaultBottomSectors;
           }
           if (parsed.aiMarketAnalysis) {
             this.aiMarketAnalysis = parsed.aiMarketAnalysis;
@@ -212,7 +179,7 @@ export const useScreenerStore = defineStore('screener', {
           const isInvalidName = (name: string) => {
             if (!name) return true;
             const clean = name.replace(/\s+/g, '');
-            return ['대형', '중형', '소형', '종합', '코스피', '코스닥', '제조', '음식료'].some(m => clean.includes(m));
+            return ['대형', '중형', '소형', '종합', '코스피', '코스닥', '제조업'].some(m => clean.includes(m));
           };
           if (response.topSectors && response.topSectors.length > 0) {
             const cleanTop = response.topSectors.filter(s => !isInvalidName(s.name));
