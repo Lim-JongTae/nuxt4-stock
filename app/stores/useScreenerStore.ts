@@ -4,7 +4,7 @@ import type { StockItem, ScreenerApiResponse, MarketBasisInfo, TopSectorInfo, Ai
 export type { StockItem, ScreenerApiResponse, MarketBasisInfo, TopSectorInfo, AiMarketAnalysisInfo };
 
 const KEY_PREFIX = 'nuxt_updown_screener_';
-const EXPIRATION_MS = 15 * 24 * 60 * 60 * 1000; // 15일 보존 정책
+const EXPIRATION_MS = 5 * 24 * 60 * 60 * 1000; // 5일 보존 정책 (주식 거래일 1주일 기준)
 
 function getTodayKey(): string {
   const d = new Date();

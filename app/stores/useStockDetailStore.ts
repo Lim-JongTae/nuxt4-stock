@@ -37,8 +37,8 @@ export interface StockDetailStateItem {
   cachedTimestamp?: number;
 }
 
-const DETAIL_KEY_PREFIX = 'nuxt4_stock_detail_';
-const EXPIRATION_MS = 15 * 24 * 60 * 60 * 1000; // 15일 보존 정책
+const DETAIL_KEY_PREFIX = 'nuxt_stock_detail_';
+const EXPIRATION_MS = 5 * 24 * 60 * 60 * 1000; // 5일 보존 정책 (주식 거래일 1주일 기준)
 
 function getTodayDetailKey(): string {
   const d = new Date();
