@@ -76,7 +76,7 @@
             <div class="text-xs text-slate-300 space-y-1">
               <div>현재가: <strong class="text-emerald-400 font-mono">{{ Number(item.closePrice).toLocaleString() }}원</strong></div>
               <div>심리선(PSY): <span class="font-mono text-slate-200">{{ item.psy ?? '-' }}</span> | RSI(14): <span class="font-mono text-slate-200">{{ item.rsi ?? '-' }}</span></div>
-              <div class="text-[11px] text-cyan-300/90 truncate">{{ item.shortSellingStatus || '수급 안정' }}</div>
+              <div class="text-[11px] text-cyan-300/90 truncate">{{ item.shortSellingStatus || '판단 보류' }}</div>
             </div>
             <div class="pt-2">
               <NuxtLink 

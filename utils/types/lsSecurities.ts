@@ -67,6 +67,13 @@ export interface StockCandleData {
 
 export type StockCandleMap = Map<string, StockCandleData>;
 
+// 5.1 LS증권 시세/차트 수집 요청 파라미터 인터페이스
+export interface FetchLSQuoteParams {
+  token: string;
+  shcode: string;
+  externalLivePrice?: number | null;
+}
+
 // 6. 8대 기술적 지표 계산 결과 인터페이스
 export interface TechnicalIndicators {
   psy: number | null;               // 심리선 (12일 기준, %)
@@ -140,19 +147,20 @@ export interface RawStockApiData {
   shcode: string;
   name: string;
   industry: string;
-  isHolding: boolean;
+  isHolding?: boolean;
+  type?: string;
   holdingQuantity?: number;
   holdingAvgPrice?: number;
   closePrice: number;
-  psy: number | null;
-  bbLower: number | null;
-  ma5: number | null;
-  ma20: number | null;
-  ma60: number | null;
-  volumeRatio: number | null;
-  macdHist: number | null;
-  rsi: number | null;
-  bullishDivergence: boolean | null;
+  psy?: number | null;
+  bbLower?: number | null;
+  ma5?: number | null;
+  ma20?: number | null;
+  ma60?: number | null;
+  volumeRatio?: number | null;
+  macdHist?: number | null;
+  rsi?: number | null;
+  bullishDivergence?: boolean | null;
   shortSellHistory?: ShortSellRecord[];
   dataSource?: string;
   errorMessage?: string | null;
@@ -164,6 +172,7 @@ export interface CalculatedStockDetail {
   name: string;
   industry: string;
   isHolding: boolean;
+  type?: string;
   holdingQuantity?: number;
   holdingAvgPrice?: number;
   closePrice: number;
@@ -193,8 +202,11 @@ export interface StockItem {
   name: string;
   industry: string;
   isHolding?: boolean;
+  type?: string;
   quantity?: number;
   avgPrice?: number;
+  holdingQuantity?: number;
+  holdingAvgPrice?: number;
   closePrice: number;
   psy?: number | null;
   bbLower?: number | null;
@@ -218,6 +230,8 @@ export interface StockItem {
   changeRate?: number;
   score: number;
   isFullyMatched: boolean;
+  shortSellHistory?: ShortSellRecord[];
+  dataSource?: string;
   createdAt: string;
 }
 
@@ -257,4 +271,56 @@ export interface ScreenerApiResponse {
   marketBasis?: MarketBasisInfo | null;
   topSectors?: TopSectorInfo[];
   bottomSectors?: TopSectorInfo[];
+}
+
+// 18. 종목 상세 스토어(useStockDetailStore) 상태 아이템 인터페이스
+export interface StockDetailStateItem {
+  shcode: string;
+  name: string;
+  industry: string;
+  closePrice: number;
+  isHolding: boolean;
+  holdingQuantity?: number;
+  holdingAvgPrice?: number;
+  score: number;
+  isFullyMatched: boolean;
+  conditions: Record<string, boolean>;
+  shortSignal?: {
+    label: string;
+    confidence: string;
+    summary: string;
+  };
+  shortSellHistory?: ShortSellRecord[];
+  psy?: number | null;
+  rsi?: number | null;
+  macdHist?: number | null;
+  volumeRatio?: number | null;
+  bbLower?: number | null;
+  generatedReport?: string;
+  generatedReportAt?: string;
+  updatedAt?: string;
+  cachedTimestamp?: number;
+}
+
+// 19. 포트폴리오/보유종목(usePortfolioStore) 상태 아이템 인터페이스
+export interface HoldingItem {
+  id?: number;
+  shcode: string;
+  name: string;
+  industry: string;
+  quantity: number;
+  avgPrice: number;
+  currentPrice: number;
+  targetPrice: number;
+  stopLossPrice: number;
+  trailingRate?: number;
+  updatedAt: string;
+  candles?: Array<{
+    date: string;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+  }>;
 }

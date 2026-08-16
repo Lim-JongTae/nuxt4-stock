@@ -1,4 +1,4 @@
-import { classifyShortSellSignal } from '../../server/utils/shortSellSignal';
+import { classifyShortSellSignal } from './useShortSellSignal';
 import type { RawStockApiData, CalculatedStockDetail } from '../../utils/types/lsSecurities';
 
 export type { RawStockApiData, CalculatedStockDetail };

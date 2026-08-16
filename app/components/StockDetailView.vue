@@ -392,7 +392,7 @@ async function persistReportToServer(reportText: string) {
 onMounted(async () => {
   stockDetailStore.initFromStorage();
   
-  // 1. LocalStorage 캐시 데이터 및 저장된 AI 보고서가 있으면 새로고침 즉시 화면 표기
+  // 1. LocalStorage 캐시 데이터 및 저장된 AI 보고서가 있으면 새로고침 없이 0ms 즉시 화면 표기
   const cached = stockDetailStore.getStockCache(props.shcode);
   if (cached) {
     stockData.value = cached;
@@ -400,9 +400,10 @@ onMounted(async () => {
       savedReportText.value = cached.generatedReport;
     }
     isLoading.value = false;
+    return; // 캐시가 있으면 매번 재수집하지 않음
   }
 
-  // 2. 백그라운드로 실시간 시세 및 수급 수집 후 LocalStorage/Store 갱신 및 화면 업데이트
+  // 2. 캐시가 완전히 비어있는 최초 1회에만 수집
   await loadStockDetail();
 });
 

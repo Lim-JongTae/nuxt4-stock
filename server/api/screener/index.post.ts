@@ -1,5 +1,5 @@
 import { db } from '../../db';
-import { stocks, holdings } from '../../db/schema';
+import { stocks, holdings, watchlist } from '../../db/schema';
 import { loadEnv, getLSToken, fetchLSPrice, fetchLSShortSellTrend, fetchLSMarketBasis, fetchLSSectorData, fetchLST1305Prices, calculateTechnicalIndicators } from '../../utils/lsApi';
 import { classifyShortSellSignal, type ShortSellRecord } from '../../utils/shortSellSignal';
 
@@ -12,9 +12,10 @@ export default defineEventHandler(async (event) => {
   const marketBasis = await fetchLSMarketBasis(token || '');
   const sectorData = await fetchLSSectorData(token || '');
 
-  // 1. SQLite DB (holdings + stocks 테이블)에서 보유종목 + 관심종목 동적 마스터 로드
+  // 1. SQLite DB (holdings + stocks + watchlist 테이블)에서 보유종목 + 관심종목 동적 마스터 로드
   const dbStocks = await db.select().from(stocks);
   const dbHoldings = await db.select().from(holdings);
+  const dbWatchlist = await db.select().from(watchlist);
 
   const stockMap = new Map<string, { shcode: string; name: string; industry: string; isHolding: boolean; avgPrice: number; quantity: number }>();
 
@@ -32,7 +33,21 @@ export default defineEventHandler(async (event) => {
     }
   });
 
-  // 관심종목 추가
+  // 관심종목(watchlist 테이블) 추가 -> isHolding: false
+  dbWatchlist.forEach(w => {
+    if (w.shcode && w.shcode.trim().length >= 4 && !stockMap.has(w.shcode.trim())) {
+      stockMap.set(w.shcode.trim(), {
+        shcode: w.shcode.trim(),
+        name: w.name,
+        industry: w.industry || '기타',
+        isHolding: false,
+        avgPrice: 0,
+        quantity: 0
+      });
+    }
+  });
+
+  // 관심종목(stocks 통합 마스터 테이블) 추가
   dbStocks.forEach(s => {
     if (s.shcode && s.shcode.trim().length >= 4 && !stockMap.has(s.shcode.trim())) {
       stockMap.set(s.shcode.trim(), {
@@ -46,17 +61,7 @@ export default defineEventHandler(async (event) => {
     }
   });
 
-  // DB에 종목이 존재하지 않을 경우 기본 5대 핵심 주식 자동 제공
-  if (stockMap.size === 0) {
-    const defaultCoreList = [
-      { shcode: '005930', name: '삼성전자', industry: '전기/전자', isHolding: true, avgPrice: 65000, quantity: 100 },
-      { shcode: '000660', name: 'SK하이닉스', industry: '전기/전자', isHolding: false, avgPrice: 0, quantity: 0 },
-      { shcode: '035420', name: 'NAVER', industry: '서비스업', isHolding: false, avgPrice: 0, quantity: 0 },
-      { shcode: '035720', name: '카카오', industry: '서비스업', isHolding: false, avgPrice: 0, quantity: 0 },
-      { shcode: '005380', name: '현대차', industry: '운수장비', isHolding: false, avgPrice: 0, quantity: 0 }
-    ];
-    defaultCoreList.forEach(item => stockMap.set(item.shcode, item));
-  }
+
 
   const candidateStocks = Array.from(stockMap.values());
 
@@ -72,10 +77,12 @@ export default defineEventHandler(async (event) => {
     for (let i = 0; i < candidateStocks.length; i += BATCH_SIZE) {
       const batch = candidateStocks.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(batch.map(async (stock) => {
-        const livePrice = await fetchLSPrice(token, stock.shcode);
-        const htsPriceMap = await fetchLST1305Prices(token, stock.shcode, livePrice);
+        const [livePrice, htsPriceMap, shortSellTrend] = await Promise.all([
+          fetchLSPrice(token, stock.shcode),
+          fetchLST1305Prices(token, stock.shcode),
+          fetchLSShortSellTrend(token, stock.shcode)
+        ]);
         const indicators = calculateTechnicalIndicators(htsPriceMap);
-        const shortSellTrend = await fetchLSShortSellTrend(token, stock.shcode, livePrice);
 
         const latestPrice = livePrice || (htsPriceMap && htsPriceMap.size > 0 ? Array.from(htsPriceMap.values())[0]?.close : undefined);
 
@@ -118,30 +125,18 @@ export default defineEventHandler(async (event) => {
   const newBatch = candidateStocks.map(s => {
     const liveData = stockLiveMap.get(s.shcode) || {};
 
-    const benchmarkPrices: Record<string, { price: number; psy: number; rsi: number; volumeRatio: number; ma20: number }> = {
-      '005930': { price: 55400, psy: 50, rsi: 42, volumeRatio: 110, ma20: 56000 },
-      '000660': { price: 186200, psy: 58, rsi: 48, volumeRatio: 125, ma20: 184000 },
-      '035420': { price: 172500, psy: 42, rsi: 38, volumeRatio: 98, ma20: 175000 },
-      '035720': { price: 36800, psy: 35, rsi: 32, volumeRatio: 105, ma20: 38500 },
-      '005380': { price: 235000, psy: 65, rsi: 55, volumeRatio: 140, ma20: 228000 },
-      '068270': { price: 195000, psy: 48, rsi: 45, volumeRatio: 115, ma20: 192000 },
-      '006400': { price: 340000, psy: 52, rsi: 49, volumeRatio: 108, ma20: 335000 },
-      '247540': { price: 152000, psy: 40, rsi: 36, volumeRatio: 95, ma20: 158000 }
-    };
-    const bench = benchmarkPrices[s.shcode] || { price: 75000, psy: 45, rsi: 40, volumeRatio: 100, ma20: 74000 };
-
     const closePrice = liveData.price ||
       (liveData.shortSellHistory && liveData.shortSellHistory[0]?.price) ||
-      bench.price;
+      0;
 
-    const psy = liveData.indicators?.psy ?? bench.psy;
-    const bb_lower = liveData.indicators?.bbLower ?? Math.round(closePrice * 0.95);
-    const ma5 = liveData.indicators?.ma5 ?? Math.round(closePrice * 0.99);
-    const ma20 = liveData.indicators?.ma20 ?? bench.ma20;
-    const ma60 = liveData.indicators?.ma60 ?? Math.round(closePrice * 0.96);
-    const volume_ratio = liveData.indicators?.volumeRatio ?? bench.volumeRatio;
-    const macd_hist = liveData.indicators?.macdHist ?? 120;
-    const rsi = liveData.indicators?.rsi ?? bench.rsi;
+    const psy = liveData.indicators?.psy ?? null;
+    const bb_lower = liveData.indicators?.bbLower ?? (closePrice > 0 ? Math.round(closePrice * 0.95) : null);
+    const ma5 = liveData.indicators?.ma5 ?? (closePrice > 0 ? Math.round(closePrice * 0.99) : null);
+    const ma20 = liveData.indicators?.ma20 ?? null;
+    const ma60 = liveData.indicators?.ma60 ?? (closePrice > 0 ? Math.round(closePrice * 0.96) : null);
+    const volume_ratio = liveData.indicators?.volumeRatio ?? null;
+    const macd_hist = liveData.indicators?.macdHist ?? null;
+    const rsi = liveData.indicators?.rsi ?? null;
     const bullish_divergence = liveData.indicators?.bullishDivergence ?? false;
 
     // 공매도 일별 이력

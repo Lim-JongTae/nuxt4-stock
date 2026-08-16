@@ -223,7 +223,7 @@
         <div class="flex items-center justify-between border-b border-slate-800 pb-3">
           <h3 class="text-sm font-bold text-white flex items-center gap-2">
             <i class="fas fa-bolt text-yellow-400"></i>
-            <span>🎯 퀀트 매수 추천 (Top 3)</span>
+            <span>🎯 관심종목 퀀트 매수 추천 (Top 3)</span>
           </h3>
           <span 
             v-if="screenerStore.has85PlusMatched" 
@@ -268,9 +268,15 @@
               </span>
             </div>
 
-            <div class="flex items-center justify-between text-xs font-mono pt-1">
-              <span class="text-slate-400">현재가:</span>
-              <strong class="text-white">{{ Number(item.closePrice).toLocaleString() }}원</strong>
+            <div class="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
+              <div class="flex items-center justify-between bg-slate-900/60 px-2 py-1 rounded border border-slate-800">
+                <span class="text-slate-400 text-[10px]">전일종가:</span>
+                <strong class="text-slate-200">{{ Number(item.closePrice || item.close || 0).toLocaleString() }}원</strong>
+              </div>
+              <div class="flex items-center justify-between bg-slate-900/60 px-2 py-1 rounded border border-slate-800">
+                <span class="text-slate-400 text-[10px]">현재가:</span>
+                <strong class="text-slate-400">-</strong>
+              </div>
             </div>
 
             <div class="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-900">

@@ -82,6 +82,14 @@
               </td>
               <td class="px-4 py-3 whitespace-nowrap">
                 <span 
+                  v-if="isEtfItem(item)"
+                  class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40"
+                  title="ETF/ETN 상품은 LS증권 Open API (t1927) 공매도 분석 대상 제외 항목입니다"
+                >
+                  ETF/ETN (공매도 t1927 제외 종목)
+                </span>
+                <span 
+                  v-else
                   class="px-2 py-0.5 rounded text-[10px] font-bold border"
                   :class="{
                     'bg-red-500/20 text-red-400 border-red-500/40': item.shortSellingStatus === '숏커버링(환매수) 유력',
@@ -90,7 +98,7 @@
                     'bg-slate-800 text-slate-400 border-slate-700': !item.shortSellingStatus
                   }"
                 >
-                  {{ item.shortSellingStatus || '실시간 분석' }}
+                  {{ item.shortSellingStatus || '판단 보류' }}
                 </span>
               </td>
               <td class="px-4 py-3 font-mono font-extrabold text-purple-300 whitespace-nowrap">
@@ -117,6 +125,14 @@ onMounted(() => {
 
 function refresh() {
   store.loadInitial(true);
+}
+
+function isEtfItem(item: any): boolean {
+  if (!item) return false;
+  const name = item.name || '';
+  const ind = item.industry || '';
+  const etfKeywords = ['KODEX', 'TIGER', 'ACE', 'SOL', 'RISE', 'KoAct', 'PLUS', 'HANARO', 'WOORI', 'UNICORN', 'TIMEFOLIO', 'HERO', 'KBSTAR', 'ARIRANG', 'ETF', 'ETN'];
+  return ind.includes('ETF') || ind.includes('ETN') || etfKeywords.some(k => name.includes(k));
 }
 
 function truncateName(name: string, maxLen: number = 13): string {

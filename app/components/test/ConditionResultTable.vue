@@ -41,7 +41,7 @@
             :class="activeShcode === item.shcode ? 'bg-purple-950/40 border-l-4 border-l-purple-500' : ''"
           >
             <td class="px-3 py-3">
-              <UBadge color="emerald" variant="subtle" size="xs">조건검색</UBadge>
+              <UBadge color="success" variant="subtle" size="xs">조건검색</UBadge>
             </td>
             <td class="px-3 py-3 font-mono text-slate-400">{{ item.shcode }}</td>
             <td class="px-3 py-3 font-bold text-white group-hover:text-purple-300">{{ item.name }}</td>
@@ -51,9 +51,9 @@
             <td class="px-3 py-3 font-mono" :class="item.volumeRatio && item.volumeRatio >= 120 ? 'text-amber-400 font-bold' : ''">{{ item.volumeRatio ?? '-' }}%</td>
             <td class="px-3 py-3 font-mono" :class="item.macdHist && item.macdHist > 0 ? 'text-emerald-400' : ''">{{ item.macdHist ?? '양전' }}</td>
             <td class="px-3 py-3 font-mono" :class="item.rsi && item.rsi <= 30 ? 'text-emerald-400 font-bold' : ''">{{ item.rsi ?? '-' }}</td>
-            <td class="px-3 py-3 text-cyan-300 font-bold text-[11px]">{{ item.shortSellingStatus || '수급 안정' }}</td>
+            <td class="px-3 py-3 text-cyan-300 font-bold text-[11px]">{{ item.shortSellingStatus || '판단 보류' }}</td>
             <td class="px-3 py-3 text-center">
-              <UBadge :color="item.score >= 85 ? 'emerald' : 'neutral'" variant="solid" size="md" class="font-extrabold">
+              <UBadge :color="item.score >= 85 ? 'success' : 'neutral'" variant="solid" size="md" class="font-extrabold">
                 {{ item.score }}점
               </UBadge>
             </td>

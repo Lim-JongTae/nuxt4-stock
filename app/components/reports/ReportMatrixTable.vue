@@ -108,7 +108,7 @@
                   'bg-slate-900 text-slate-300 border border-slate-700': !['숏커버링(환매수) 유력', '신규 공매도 유입', '매수세가 공매도 흡수 중'].includes(item.shortSellingStatus || '')
                 }"
               >
-                {{ item.shortSellingStatus || '수급 안정' }}
+                {{ item.shortSellingStatus || '판단 보류' }}
               </span>
             </td>
 

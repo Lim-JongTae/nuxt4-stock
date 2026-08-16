@@ -1,41 +1,6 @@
 import { defineStore } from 'pinia';
 import { calculateQuantIndicators } from '../composables/useQuantIndicatorCalculator';
-
-export interface ShortSellRecord {
-  date: string;
-  price: number;
-  volume: number;
-  shortAvgPrice?: number;
-  balanceRatio?: number;
-}
-
-export interface StockDetailStateItem {
-  shcode: string;
-  name: string;
-  industry: string;
-  closePrice: number;
-  isHolding: boolean;
-  holdingQuantity?: number;
-  holdingAvgPrice?: number;
-  score: number;
-  isFullyMatched: boolean;
-  conditions: Record<string, boolean>;
-  shortSignal?: {
-    label: string;
-    confidence: string;
-    summary: string;
-  };
-  shortSellHistory?: ShortSellRecord[];
-  psy?: number | null;
-  rsi?: number | null;
-  macdHist?: number | null;
-  volumeRatio?: number | null;
-  bbLower?: number | null;
-  generatedReport?: string;
-  generatedReportAt?: string;
-  updatedAt?: string;
-  cachedTimestamp?: number;
-}
+import type { ShortSellRecord, StockDetailStateItem } from '../../utils/types/lsSecurities';
 
 const DETAIL_KEY_PREFIX = 'nuxt_stock_detail_';
 const EXPIRATION_MS = 5 * 24 * 60 * 60 * 1000; // 5일 보존 정책 (주식 거래일 1주일 기준)

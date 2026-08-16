@@ -1,22 +1,51 @@
-import fs from 'fs';
-import path from 'path';
 import { defineEventHandler } from 'h3';
+import { db } from '../../db';
+import { stocks, holdings, watchlist as watchlistTable } from '../../db/schema';
 
-// Reads watchlist data from JSON file in the project root "data" folder.
-export default defineEventHandler(() => {
-  const dataPath = path.resolve(process.cwd(), 'data', 'watchlist.json');
-  if (!fs.existsSync(dataPath)) {
-    return { holdings: [], watchlist: [] };
-  }
-  const raw = fs.readFileSync(dataPath, 'utf-8');
+export default defineEventHandler(async () => {
   try {
-    const json = JSON.parse(raw);
+    const dbHoldings = await db.select().from(holdings).all();
+    const dbWatchlist = await db.select().from(watchlistTable).all();
+    const dbStocks = await db.select().from(stocks).all();
+
+    const holdingsList = [...dbHoldings];
+    const watchlistMap = new Map<string, any>();
+
+    // 1. watchlist 테이블 항목 수집
+    dbWatchlist.forEach(w => {
+      watchlistMap.set(w.shcode, {
+        shcode: w.shcode,
+        name: w.name,
+        industry: w.industry || '주요업종',
+        type: 'watchlist'
+      });
+    });
+
+    // 2. stocks 마스터 테이블 관심종목 수집
+    dbStocks.forEach(s => {
+      if (s.type === 'watchlist' && !watchlistMap.has(s.shcode)) {
+        watchlistMap.set(s.shcode, {
+          shcode: s.shcode,
+          name: s.name,
+          industry: s.industry || '주요업종',
+          type: 'watchlist'
+        });
+      }
+    });
+
+    const watchlistList = Array.from(watchlistMap.values());
+
     return {
-      holdings: json.holdings ?? [],
-      watchlist: json.watchlist ?? []
+      success: true,
+      holdings: holdingsList,
+      watchlist: watchlistList
     };
-  } catch (e) {
-    console.error('Failed to parse watchlist.json', e);
-    return { holdings: [], watchlist: [] };
+  } catch (e: any) {
+    console.error('⚠️ [Watchlist API GET Error]:', e);
+    return {
+      success: false,
+      holdings: [],
+      watchlist: []
+    };
   }
 });

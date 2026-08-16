@@ -56,13 +56,13 @@
         
         <!-- List Filters & Search Bar -->
         <div class="flex flex-wrap items-center justify-between gap-2 shrink-0">
-          <div class="relative flex-1 min-w-[200px]">
+          <div class="relative flex-1 min-w-50">
             <i class="fas fa-search absolute left-3 top-2.5 text-slate-500 text-xs"></i>
             <input 
               v-model="searchQuery" 
               type="text" 
               placeholder="종목명 또는 종목코드 검색..."
-              class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-100 placeholder:opacity-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
             />
           </div>
 
@@ -352,6 +352,8 @@
 import { ref, computed, watch } from 'vue';
 import { useScreenerStore } from '@/stores/useScreenerStore';
 import { usePortfolioStore } from '@/stores/usePortfolioStore';
+import { useLSStockRawStore } from '@/stores/useLSStockRawStore';
+import { useGlobalToast } from '@/composables/useGlobalToast';
 
 export interface StockItemForm {
   shcode: string;
@@ -374,6 +376,7 @@ const emit = defineEmits<{
 
 const screenerStore = useScreenerStore();
 const portfolioStore = usePortfolioStore();
+const toast = useGlobalToast();
 
 const viewMode = ref<'list' | 'form'>('list');
 const isEditMode = ref(false);
@@ -429,6 +432,18 @@ const watchlistStocks = computed(() => filteredStockList.value.filter(s => s.typ
 async function fetchStockList() {
   isLoadingList.value = true;
   try {
+    const rawStore = useLSStockRawStore();
+    if (rawStore.rawStockList && rawStore.rawStockList.length > 0) {
+      stockList.value = rawStore.rawStockList.map(s => ({
+        shcode: s.shcode,
+        name: s.name,
+        industry: s.industry || '주요업종',
+        type: (s.isHolding || s.type === 'holding') ? 'holding' : 'watchlist',
+        avgPrice: s.holdingAvgPrice ?? s.avgPrice ?? 0,
+        quantity: s.holdingQuantity ?? s.quantity ?? 0
+      }));
+    }
+
     const res = await $fetch<any>('/api/stocks?ts=' + Date.now());
     if (res && res.success && res.data && Array.isArray(res.data.all)) {
       stockList.value = res.data.all;
@@ -451,7 +466,7 @@ watch(() => props.isOpen, async (newVal) => {
     if (props.initialData) {
       editStockItem(props.initialData);
     } else {
-      viewMode.value = 'list';
+      switchToCreate();
     }
   }
 });
@@ -499,28 +514,29 @@ async function submitForm() {
   errorMsg.value = null;
 
   try {
+    const rawStore = useLSStockRawStore();
+
     if (isEditMode.value) {
-      await $fetch(`/api/stocks/${form.value.shcode}`, {
-        method: 'PUT',
-        body: form.value
-      });
+      // 1. Store 액션 호출 (Store state 변경 + DB 수정)
+      await rawStore.updateStock(form.value.shcode, form.value);
+      toast.success(`${form.value.name}(${form.value.shcode}) 종목 정보가 수정되었습니다.`, '종목 정보 수정 완료');
     } else {
-      await $fetch('/api/stocks', {
-        method: 'POST',
-        body: form.value
-      });
+      // 1. Store 액션 호출 (Store state 변경 + DB 추가)
+      await rawStore.addStock(form.value);
+      toast.success(`${form.value.name}(${form.value.shcode}) 종목이 DB에 신규 추가되었습니다.`, '종목 추가 완료');
     }
-    
+
     emit('saved');
     await fetchStockList();
     switchToList();
 
-    // 종목 추가/편집 후 스토어 실시간 갱신
+    // 2. 파생 스토어 실시간 연동
     portfolioStore.fetchHoldings(true);
     screenerStore.refreshScreener();
   } catch (err: any) {
     console.error('Submit stock form error:', err);
     errorMsg.value = err.statusMessage || err.message || 'SQLite DB 저장 중 오류가 발생했습니다.';
+    toast.error(errorMsg.value, 'DB 저장 실패');
   } finally {
     isSubmitting.value = false;
   }
@@ -532,17 +548,22 @@ async function deleteStockItemDirect(item: StockItemForm) {
   errorMsg.value = null;
 
   try {
-    await $fetch(`/api/stocks/${item.shcode}`, {
-      method: 'DELETE'
-    });
+    const rawStore = useLSStockRawStore();
+
+    // 1. Store 액션 호출 (Store state 변경 + DB 삭제)
+    await rawStore.deleteStock(item.shcode);
+    toast.success(`${item.name}(${item.shcode}) 종목이 DB에서 완전히 삭제되었습니다.`, '종목 DB 삭제 완료');
+
     emit('saved');
     await fetchStockList();
 
+    // 2. 파생 스토어 실시간 연동
     portfolioStore.fetchHoldings(true);
     screenerStore.refreshScreener();
   } catch (err: any) {
     console.error('Delete stock error:', err);
     errorMsg.value = err.statusMessage || err.message || '종목 삭제 실패';
+    toast.error(errorMsg.value, '삭제 처리 실패');
   } finally {
     isSubmitting.value = false;
   }

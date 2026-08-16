@@ -78,12 +78,16 @@
           <p class="text-[10px] text-slate-400">RSI(14일) 반등</p>
         </div>
 
-        <div class="bg-slate-950/70 border border-rose-500/30 p-2 rounded-xl space-y-1">
+        <div 
+          @click="openShortSellReportModal(screenerStore.newData[0])"
+          class="bg-slate-950/70 border border-rose-500/30 p-2 rounded-xl space-y-1 cursor-pointer hover:bg-rose-950/30 transition-all group"
+          title="공매도 4단계 정량 분석 리포트 열기"
+        >
           <div class="text-[11px] font-bold text-rose-400 flex items-center justify-between">
-            <span>7. 공매도 분석</span>
-            <span class="px-1 py-0.5 rounded bg-rose-500/20 text-[9px]">t1927</span>
+            <span class="group-hover:underline">7. 공매도 분석</span>
+            <span class="px-1 py-0.5 rounded bg-rose-500/20 text-[9px] font-mono">t1927 리포트 📊</span>
           </div>
-          <p class="text-[10px] text-slate-400">숏커버링 vs 경계</p>
+          <p class="text-[10px] text-slate-400">숏커버링 vs 경계 4단계 분석</p>
         </div>
 
         <div class="bg-slate-950/70 border border-indigo-500/30 p-2 rounded-xl space-y-1">
@@ -191,6 +195,21 @@
           </div>
         </div>
 
+        <!-- RED ERROR BANNER FOR LS SECURITIES API FAILURE -->
+        <div v-if="screenerStore.errorMessage" class="bg-rose-950/90 border border-rose-500/60 p-4 rounded-xl text-rose-200 text-xs flex items-center justify-between gap-3 shadow-lg my-2">
+          <div class="flex items-center gap-2.5">
+            <i class="fas fa-exclamation-triangle text-rose-400 text-lg"></i>
+            <div>
+              <strong class="font-bold text-rose-300">🚨 [LS증권 Open API 수신 실패 오류]</strong>
+              <p class="text-rose-200/90 mt-0.5">{{ screenerStore.errorMessage }}</p>
+              <p class="text-[10px] text-rose-400/80">무하드코딩 원칙에 따라 대체/가짜 데이터를 생성하지 않고 오류 사유를 명확히 표시합니다.</p>
+            </div>
+          </div>
+          <button @click="screenerStore.refreshScreener()" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold cursor-pointer shrink-0">
+            실시간 시세 갱신 재시도
+          </button>
+        </div>
+
         <div class="overflow-x-auto border border-slate-800 rounded-xl bg-slate-950/90 shadow-md">
           <table class="w-full text-xs text-left text-slate-300">
             <thead class="bg-slate-900/90 text-slate-400 font-semibold border-b border-slate-800 uppercase text-[11px]">
@@ -262,22 +281,34 @@
                 <td class="px-3 py-3 font-bold" :title="item.shortSellingSummary || ''">
                   <div class="flex flex-col gap-1 items-start">
                     <span 
-                      class="px-2 py-0.5 rounded text-[10px] font-semibold flex items-center gap-1"
+                      v-if="isEtfItem(item)" 
+                      class="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40 inline-flex items-center gap-1"
+                      title="ETF/ETN 상품은 LS증권 Open API (t1927) 공매도 분석 대상 제외 항목입니다"
+                    >
+                      <i class="fas fa-info-circle text-[9px] text-purple-400"></i>
+                      <span>ETF/ETN (공매도 t1927 제외 종목)</span>
+                    </span>
+                    <button 
+                      v-else
+                      @click="openShortSellReportModal(item)"
+                      class="px-2 py-0.5 rounded text-[10px] font-semibold flex items-center gap-1 cursor-pointer hover:opacity-90 transition-all border shadow-xs"
                       :class="{
-                        'bg-red-500/20 text-red-400 border border-red-500/40': item.shortSellingStatus === '숏커버링(환매수) 유력',
-                        'bg-blue-500/20 text-blue-400 border border-blue-500/40': item.shortSellingStatus === '신규 공매도 유입',
-                        'bg-pink-500/20 text-pink-400 border border-pink-500/40': item.shortSellingStatus === '매수세가 공매도 흡수 중',
-                        'bg-slate-900 text-white border border-slate-400/50': !['숏커버링(환매수) 유력', '신규 공매도 유입', '매수세가 공매도 흡수 중'].includes(item.shortSellingStatus || '')
+                        'bg-red-500/20 text-red-400 border-red-500/40 hover:bg-red-500/30': item.shortSellingStatus === '숏커버링(환매수) 유력',
+                        'bg-blue-500/20 text-blue-400 border-blue-500/40 hover:bg-blue-500/30': item.shortSellingStatus === '신규 공매도 유입',
+                        'bg-pink-500/20 text-pink-400 border-pink-500/40 hover:bg-pink-500/30': item.shortSellingStatus === '매수세가 공매도 흡수 중',
+                        'bg-slate-900 text-white border-slate-400/50 hover:bg-slate-800': !['숏커버링(환매수) 유력', '신규 공매도 유입', '매수세가 공매도 흡수 중'].includes(item.shortSellingStatus || '')
                       }"
+                      title="4단계 공매도 정량 분석 리포트 보기"
                     >
                       <i v-if="item.shortSellingStatus === '숏커버링(환매수) 유력'" class="fas fa-arrow-up text-[9px] text-red-400"></i>
                       <i v-else-if="item.shortSellingStatus === '신규 공매도 유입'" class="fas fa-arrow-down text-[9px] text-blue-400"></i>
-                      <span>{{ item.shortSellingStatus || '숏커버링(환매수) 유력' }}</span>
-                    </span>
-                    <div class="text-[9px] text-rose-300 font-mono flex items-center gap-1" v-if="item.shortAvgPrice && item.shortAvgPrice > 0">
+                      <span>{{ item.shortSellingStatus || '판단 보류' }}</span>
+                      <i class="fas fa-file-alt text-[9px] text-rose-300 ml-1"></i>
+                    </button>
+                    <div class="text-[9px] text-rose-300 font-mono flex items-center gap-1" v-if="!isEtfItem(item) && item.shortAvgPrice && item.shortAvgPrice > 0">
                       <span>평단가: {{ Number(item.shortAvgPrice).toLocaleString() }}원</span>
                     </div>
-                    <div class="text-[9px] text-amber-300/90 font-mono" v-if="item.shortVolume && item.shortVolume > 0">
+                    <div class="text-[9px] text-amber-300/90 font-mono" v-if="!isEtfItem(item) && item.shortVolume && item.shortVolume > 0">
                       <span>매도량: {{ Number(item.shortVolume).toLocaleString() }}주</span>
                     </div>
                   </div>
@@ -394,20 +425,76 @@
         </div>
       </div>
 
-     
+      <!-- Short Sell Quantitative Analysis Modal Component -->
+      <ShortSellReportModal 
+        :is-open="isShortSellModalOpen" 
+        :stock="selectedShortStock" 
+        @close="isShortSellModalOpen = false" 
+      />
+
+      <!-- Stock Detail Modal Component -->
+      <StockDetailModal 
+        :is-open="isDetailModalOpen" 
+        :shcode="selectedDetailShcode" 
+        @close="isDetailModalOpen = false"
+        @updated="screenerStore.refreshScreener()"
+      />
+
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useScreenerStore, type StockItem } from '~/stores/useScreenerStore';
+import ShortSellReportModal from '~/components/shortselling/ShortSellReportModal.vue';
+import StockDetailModal from '~/components/StockDetailModal.vue';
+import { logShortSellQuantitativeReport } from '~/utils/shortSellReportLogger';
 
 const screenerStore = useScreenerStore();
+const isShortSellModalOpen = ref(false);
+const selectedShortStock = ref<any>(null);
+
+const isDetailModalOpen = ref(false);
+const selectedDetailShcode = ref('');
+
+function openDetailModal(shcode: string) {
+  selectedDetailShcode.value = shcode;
+  isDetailModalOpen.value = true;
+}
+
+function openShortSellReportModal(item?: any) {
+  selectedShortStock.value = item || (screenerStore.newData.length > 0 ? screenerStore.newData[0] : null);
+  isShortSellModalOpen.value = true;
+  if (selectedShortStock.value) {
+    logShortSellQuantitativeReport(selectedShortStock.value, '모달 클릭 버튼');
+  }
+}
 
 onMounted(async () => {
   await screenerStore.loadInitial(false);
+  if (screenerStore.newData && screenerStore.newData.length > 0) {
+    screenerStore.newData.slice(0, 3).forEach(stock => {
+      logShortSellQuantitativeReport(stock, '스크리너 자동 마운트 파싱');
+    });
+  }
 });
+
+watch(() => screenerStore.newData, (newList) => {
+  if (newList && newList.length > 0) {
+    newList.slice(0, 3).forEach(stock => {
+      logShortSellQuantitativeReport(stock, '스크리너 데이터 갱신');
+    });
+  }
+}, { immediate: true });
+
+function isEtfItem(item: any): boolean {
+  if (!item) return false;
+  const name = item.name || '';
+  const ind = item.industry || '';
+  const etfKeywords = ['KODEX', 'TIGER', 'ACE', 'SOL', 'RISE', 'KoAct', 'PLUS', 'HANARO', 'WOORI', 'UNICORN', 'TIMEFOLIO', 'HERO', 'KBSTAR', 'ARIRANG', 'ETF', 'ETN'];
+  return ind.includes('ETF') || ind.includes('ETN') || etfKeywords.some(k => name.includes(k));
+}
 
 function getPriceDelta(newItem: StockItem) {
   const oldItem = screenerStore.oldData.find(o => o.shcode === newItem.shcode);

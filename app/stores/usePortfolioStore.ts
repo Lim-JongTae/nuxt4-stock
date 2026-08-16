@@ -1,26 +1,7 @@
 import { defineStore } from 'pinia';
-
-export interface HoldingItem {
-  id?: number;
-  shcode: string;
-  name: string;
-  industry: string;
-  quantity: number;
-  avgPrice: number;
-  currentPrice: number;
-  targetPrice: number;
-  stopLossPrice: number;
-  trailingRate?: number;
-  updatedAt: string;
-  candles?: Array<{
-    date: string;
-    open: number;
-    high: number;
-    low: number;
-    close: number;
-    volume: number;
-  }>;
-}
+import type { HoldingItem } from '../../utils/types/lsSecurities';
+import { useLSStockRawStore } from './useLSStockRawStore';
+import { useScreenerStore } from './useScreenerStore';
 
 export const usePortfolioStore = defineStore('portfolio', {
   state: () => ({
@@ -34,13 +15,30 @@ export const usePortfolioStore = defineStore('portfolio', {
 
   getters: {
     totalPurchaseAmount: (state) => {
-      return state.holdings.reduce((sum, item) => sum + ((Number(item.avgPrice) || 0) * (Number(item.quantity) || 0)), 0);
+      const rawStore = useLSStockRawStore();
+      const list = state.holdings.length > 0 ? state.holdings : rawStore.holdingsList;
+      return list.reduce((sum, item) => {
+        const price = Number(item.avgPrice ?? (item as any).holdingAvgPrice) || 0;
+        const qty = Number(item.quantity ?? (item as any).holdingQuantity) || 0;
+        return sum + (price * qty);
+      }, 0);
     },
     totalValuationAmount: (state) => {
-      return state.holdings.reduce((sum, item) => {
-        const price = (Number(item.currentPrice) > 0 ? Number(item.currentPrice) : Number(item.avgPrice)) || 0;
-        const qty = Number(item.quantity) || 0;
-        return sum + (price * qty);
+      const rawStore = useLSStockRawStore();
+      const screenerStore = useScreenerStore();
+      const list = state.holdings.length > 0 ? state.holdings : rawStore.holdingsList;
+
+      return list.reduce((sum, item) => {
+        const rawStock = rawStore.rawStockMap.get(item.shcode);
+        const screenerStock = screenerStore.newData.find(s => s.shcode === item.shcode);
+        const livePrice = (rawStock?.closePrice && rawStock.closePrice > 0)
+          ? rawStock.closePrice
+          : (screenerStock?.closePrice && screenerStock.closePrice > 0)
+            ? screenerStock.closePrice
+            : (Number(item.currentPrice) > 0 ? Number(item.currentPrice) : Number((item as any).holdingAvgPrice || item.avgPrice)) || 0;
+
+        const qty = Number(item.quantity ?? (item as any).holdingQuantity) || 0;
+        return sum + (livePrice * qty);
       }, 0);
     },
     totalPnlAmount(): number {
@@ -71,13 +69,44 @@ export const usePortfolioStore = defineStore('portfolio', {
       this.isLoading = true;
       this.errorMessage = null;
       try {
+        const rawStore = useLSStockRawStore();
+        const screenerStore = useScreenerStore();
+        
+        // Screener 시세 수집이 완료되지 않았으면 로드
+        if (!rawStore.hasRawData) {
+          await screenerStore.loadInitial(false);
+        }
+
         const data = await $fetch<HoldingItem[]>(`/api/holdings?ts=${Date.now()}`);
-        if (data && Array.isArray(data)) {
-          this.holdings = data.map(h => ({
-            ...h,
-            quantity: Number(h.quantity) || 0,
-            avgPrice: Number(h.avgPrice) || 0,
-            currentPrice: Number(h.currentPrice) > 0 ? Number(h.currentPrice) : (Number(h.avgPrice) || 0)
+        if (data && Array.isArray(data) && data.length > 0) {
+          this.holdings = data.map(h => {
+            const rawStock = rawStore.rawStockMap.get(h.shcode);
+            const screenerStock = screenerStore.newData.find(s => s.shcode === h.shcode);
+            const livePrice = (rawStock?.closePrice && rawStock.closePrice > 0)
+              ? rawStock.closePrice
+              : (screenerStock?.closePrice && screenerStock.closePrice > 0)
+                ? screenerStock.closePrice
+                : (Number(h.currentPrice) > 0 ? Number(h.currentPrice) : Number(h.avgPrice));
+
+            return {
+              ...h,
+              quantity: Number(h.quantity) || 0,
+              avgPrice: Number(h.avgPrice) || 0,
+              currentPrice: Number(livePrice) > 0 ? Number(livePrice) : (Number(h.avgPrice) || 0)
+            };
+          });
+        } else if (rawStore.holdingsList && rawStore.holdingsList.length > 0) {
+          this.holdings = rawStore.holdingsList.map(h => ({
+            shcode: h.shcode,
+            name: h.name,
+            industry: h.industry || '주요보유',
+            quantity: h.holdingQuantity ?? h.quantity ?? 0,
+            avgPrice: h.holdingAvgPrice ?? h.avgPrice ?? 0,
+            currentPrice: h.closePrice || h.holdingAvgPrice || h.avgPrice || 0,
+            targetPrice: h.targetPrice || 0,
+            stopLossPrice: h.stopLossPrice || 0,
+            trailingRate: 2.5,
+            updatedAt: rawStore.lastUpdated || new Date().toLocaleString('ko-KR')
           }));
         }
       } catch (err: any) {
