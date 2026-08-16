@@ -1,8 +1,24 @@
 import type { ShortSellRecord, ShortSellSignalResult } from '../../utils/types/lsSecurities';
 
 /**
- * 최근 5일치(또는 2일 이상) 공매도 시계열 데이터로 5일 누적 추세(잔고비율 %p, 주가 %, 거래량 %)를 계산하여
- * 노이즈를 제거하고 4가지 라벨 및 신뢰도를 분석하는 함수
+ * 날짜 문자열(YYYYMMDD 또는 YYYY-MM-DD 등)을 안전하게 타임스탬프(ms)로 변환하는 유틸 함수
+ */
+function safeParseTimestamp(dateStr: string): number {
+  if (!dateStr) return 0;
+  const clean = String(dateStr).trim().replace(/[^0-9]/g, '');
+  if (clean.length === 8) {
+    const year = parseInt(clean.slice(0, 4), 10);
+    const month = parseInt(clean.slice(4, 6), 10) - 1;
+    const day = parseInt(clean.slice(6, 8), 10);
+    return new Date(year, month, day).getTime();
+  }
+  const timestamp = new Date(dateStr).getTime();
+  return isNaN(timestamp) ? 0 : timestamp;
+}
+
+/**
+ * 최근 공매도 시계열 데이터로 5일 누적 추세(잔고비율 %p, 주가 %, 거래량 %)를 계산하여
+ * 노이즈를 제거하고 4가지 라벨 및 신뢰도(5일 이상: 높음, 3~4일: 중간, 2일 이하: 낮음)를 분석하는 함수
  */
 export function classifyShortSellSignal(shortSellData: ShortSellRecord[], isEtfOrForeign?: boolean): ShortSellSignalResult {
   if (isEtfOrForeign) {
@@ -23,14 +39,14 @@ export function classifyShortSellSignal(shortSellData: ShortSellRecord[], isEtfO
     };
   }
 
-  // 날짜 오름차순 정렬 (과거 -> 최신)
-  const sortedData = [...shortSellData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  // 날짜 오름차순 정렬 (과거 -> 최신) - YYYYMMDD / YYYY-MM-DD 포맷 안전 처리
+  const sortedData = [...shortSellData].sort((a, b) => safeParseTimestamp(a.date) - safeParseTimestamp(b.date));
   
   const start = sortedData[0]!;
   const latest = sortedData[sortedData.length - 1]!;
   const daysCount = sortedData.length;
 
-  // 1. 기간 누적 잔고비율 변화 (%p)
+  // 1. 기간 누적 잔고비율 변화 (%p) - 소수점 2자리 보정
   const balanceRatioDiff = Number((latest.balanceRatio - start.balanceRatio).toFixed(2));
 
   // 2. 기간 누적 주가 변화율 (%)
@@ -47,7 +63,11 @@ export function classifyShortSellSignal(shortSellData: ShortSellRecord[], isEtfO
     ? Number((((latest.volume - avgVolume) / avgVolume) * 100).toFixed(2))
     : 0;
 
-  // 4가지 라벨 추세 분류 (공매도 잔고 감소 시 숏커버링 유력 판정)
+  // 4가지 라벨 추세 분류
+  // - balanceRatioDiff < 0: 공매도 잔고 감소 -> 숏커버링 유력
+  // - balanceRatioDiff > 0 && priceDiffRate < 0: 잔고 증가 & 주가 하락 -> 신규 공매도 유입
+  // - balanceRatioDiff > 0 && priceDiffRate >= 0: 잔고 증가 & 주가 상승/보합 -> 매수세가 공매도 흡수 중
+  // - balanceRatioDiff === 0 (잔고 변동 없음/동률): 판단 보류
   let label: ShortSellSignalResult["label"] = "판단 보류";
   if (balanceRatioDiff < 0) {
     label = "숏커버링(환매수) 유력";
@@ -59,23 +79,26 @@ export function classifyShortSellSignal(shortSellData: ShortSellRecord[], isEtfO
     label = "판단 보류";
   }
 
-  console.log(`[LS증권 t1927 공매도 수급 계산 테스트]`, {
-    daysCount,
-    startDate: start.date,
-    latestDate: latest.date,
-    startBalanceRatio: start.balanceRatio,
-    latestBalanceRatio: latest.balanceRatio,
-    balanceRatioDiffP: `${balanceRatioDiff}%p`,
-    priceDiffRate: `${priceDiffRate}%`,
-    volumeDiffRate: `${volumeDiffRate}%`,
-    classifiedLabel: label
-  });
+  // 개발 환경 콘솔 디버그 로그 조건부 처리 (프로덕션 환경 로그 오염 방지)
+  if (import.meta.dev || (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development')) {
+    console.log(`[LS증권 t1927 공매도 수급 계산 테스트]`, {
+      daysCount,
+      startDate: start.date,
+      latestDate: latest.date,
+      startBalanceRatio: start.balanceRatio,
+      latestBalanceRatio: latest.balanceRatio,
+      balanceRatioDiffP: `${balanceRatioDiff}%p`,
+      priceDiffRate: `${priceDiffRate}%`,
+      volumeDiffRate: `${volumeDiffRate}%`,
+      classifiedLabel: label
+    });
+  }
 
-  // 분석 기간 및 수급 변화율에 따른 신뢰도 판정
-  let confidence: ShortSellSignalResult["confidence"] = "높음";
-  if (daysCount >= 3) {
+  // 분석 기간(수집 일수)에 따른 신뢰도 판정 (5일 이상: 높음, 3~4일: 중간, 2일 이하: 낮음)
+  let confidence: ShortSellSignalResult["confidence"] = "낮음";
+  if (daysCount >= 5) {
     confidence = "높음";
-  } else if (daysCount >= 2) {
+  } else if (daysCount >= 3) {
     confidence = "중간";
   } else {
     confidence = "낮음";
@@ -107,3 +130,4 @@ export function useShortSellSignal() {
     classifyShortSellSignal
   };
 }
+

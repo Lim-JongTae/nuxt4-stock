@@ -114,11 +114,27 @@ export default defineEventHandler(async (event) => {
       const closePrice = priceData || (candles && candles.size > 0 ? Array.from(candles.values())[0]?.close : 0) || 0;
 
       // 8대 조건 검사 & 퀀트 점수 산출
-      const isBbLowerSupport = typeof tech.bbLower === 'number' && tech.bbLower > 0 && closePrice > 0 && closePrice <= Math.round(tech.bbLower * 1.02);
+      const BOLLINGER_BAND_TOLERANCE_RATE = 1.02;
+      const isBbLowerSupport = typeof tech.bbLower === 'number' && tech.bbLower > 0 && closePrice > 0 && closePrice <= Math.round(tech.bbLower * BOLLINGER_BAND_TOLERANCE_RATE);
       const isMaGoldenCross = typeof tech.ma5 === 'number' && typeof tech.ma20 === 'number' && typeof tech.ma60 === 'number' &&
                             tech.ma5 > 0 && tech.ma20 > 0 && tech.ma60 > 0 && tech.ma5 >= tech.ma20 && tech.ma20 >= tech.ma60;
       const isVolumeSpike = typeof tech.volumeRatio === 'number' && tech.volumeRatio >= 120.0;
-      const isShortSignalValid = shortSignal.label === "숏커버링(환매수) 유력" || shortSignal.label === "매수세가 공매도 흡수 중";
+      // 공매도 수급 신호 스코어링 (Option 1: 보조 지표 방식)
+      let shortSignalScore = 0;
+      if (!shortRecords || shortRecords.length === 0 || isEtfOrForeign) {
+        // 공매도 데이터 미수집 시 중립 보정 5점 부여
+        shortSignalScore = 5;
+      } else if (isShortSignalValid) {
+        // 호재 신호: 신뢰도별 우대 점수 (높음=15점, 중간=11점, 낮음=7점)
+        const shortSignalScoreMap: Record<string, number> = { "높음": 15, "중간": 11, "낮음": 7 };
+        shortSignalScore = shortSignalScoreMap[shortSignal.confidence] ?? 7;
+      } else if (shortSignal.label === "신규 공매도 유입") {
+        // 악재 신호: -5점 감점
+        shortSignalScore = -5;
+      } else {
+        // 보합 / 판단 보류: 0점
+        shortSignalScore = 0;
+      }
 
       let score = 0;
       if (typeof tech.psy === 'number' && tech.psy <= 25) score += 20;
@@ -126,7 +142,7 @@ export default defineEventHandler(async (event) => {
       if (isBbLowerSupport) score += 15;
       if (isMaGoldenCross) score += 15;
       if (isVolumeSpike) score += 15;
-      if (isShortSignalValid) score += 15;
+      score += shortSignalScore;
 
       processedResults.push({
         shcode: shcodeWithPrefix,

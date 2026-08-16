@@ -21,51 +21,67 @@ export async function fetchLSShortSellDetailMap(
     'https://openapi.ls-sec.co.kr/stock/etc'
   ];
 
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json; charset=utf-8',
-          'authorization': 'Bearer ' + token,
-          'tr_cd': 't1927',
-          'tr_cont': 'N'
-        },
-        body: JSON.stringify({
-          t1927InBlock: {
-            shcode: rawCode,
-            sdate: sdate,
-            edate: edate
-          }
-        }),
-        signal: AbortSignal.timeout(2500)
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const rows = data.t1927OutBlock1 || data.t1927OutBlock;
-        if (Array.isArray(rows) && rows.length > 0) {
-          rows.forEach((r: any) => {
-            const rawDate = String(r.date || '').trim();
-            const formattedDate = rawDate.length === 8 
-              ? `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`
-              : rawDate;
-            
-            const balanceRatio = parseLSNumberOrUndefined(r.gm_per) ?? parseLSNumberOrUndefined(r.ms_m_rate) ?? parseLSNumberOrUndefined(r.ms_rate) ?? 0;
-            const shortAvgPrice = parseLSNumberOrUndefined(r.gm_avg) ?? parseLSNumberOrUndefined(r.price) ?? 0;
-            const shortVolume = parseLSNumber(r.gm_vo) || parseLSNumber(r.gm_vo_sum) || 0;
-            const changeRate = parseFloat(String(r.diff || 0));
-
-            if (formattedDate) {
-              detailMap.set(formattedDate, { balanceRatio, shortAvgPrice, shortVolume, changeRate });
-            }
-          });
-          if (detailMap.size > 0) break;
-        }
-      }
-    } catch (e: any) {
-      console.warn(`⚠️ [LS증권 t1927 공매도 API 수신 실패 - ${shcode}]:`, e.message || String(e));
+  // LS증권 t1927 공매도 데이터 수집 (최대 2회 시도: 1회 실패 시 500ms 대기 후 자동 재시도)
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) {
+      await new Promise(r => setTimeout(r, 500));
     }
+
+    for (const url of urls) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json; charset=utf-8',
+            'authorization': 'Bearer ' + token,
+            'tr_cd': 't1927',
+            'tr_cont': 'N'
+          },
+          body: JSON.stringify({
+            t1927InBlock: {
+              shcode: rawCode,
+              sdate: sdate,
+              edate: edate
+            }
+          }),
+          signal: AbortSignal.timeout(2500)
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const rows = data.t1927OutBlock1 || data.t1927OutBlock;
+          if (Array.isArray(rows) && rows.length > 0) {
+            // 개발 환경에서 t1927 수신 응답 필드 디버그 로깅
+            if (import.meta.dev || (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development')) {
+              console.log(`[LS증권 t1927 샘플 응답 - ${shcode}]:`, rows[0]);
+            }
+
+            rows.forEach((r: any) => {
+              const rawDate = String(r.date || '').trim();
+              const formattedDate = rawDate.length === 8 
+                ? `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`
+                : rawDate;
+              
+              // t1927 표준 규격: ms_m_rate(공매도 잔고비율 %) -> gm_per(공매도 비중 %) -> ms_rate 순서
+              const balanceRatioRaw = parseLSNumberOrUndefined(r.ms_m_rate) ?? parseLSNumberOrUndefined(r.gm_per) ?? parseLSNumberOrUndefined(r.ms_rate);
+              const balanceRatio = balanceRatioRaw !== undefined ? balanceRatioRaw : 0;
+
+              const shortAvgPrice = parseLSNumberOrUndefined(r.gm_avg) ?? parseLSNumberOrUndefined(r.price) ?? 0;
+              const shortVolume = parseLSNumber(r.gm_vo) || parseLSNumber(r.gm_vo_sum) || 0;
+              const changeRate = parseFloat(String(r.diff || 0));
+
+              if (formattedDate) {
+                detailMap.set(formattedDate, { balanceRatio, shortAvgPrice, shortVolume, changeRate });
+              }
+            });
+            if (detailMap.size > 0) break;
+          }
+        }
+      } catch (e: any) {
+        console.warn(`⚠️ [LS증권 t1927 공매도 API 수신 시도 ${attempt + 1}/2 실패 - ${shcode}]:`, e.message || String(e));
+      }
+    }
+    if (detailMap.size > 0) break;
   }
   return detailMap;
 }

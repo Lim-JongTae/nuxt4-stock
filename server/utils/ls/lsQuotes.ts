@@ -69,7 +69,7 @@ export async function fetchLST1305Prices(
 
   const htsMap: StockCandleMap = new Map<string, StockCandleData>();
 
-  const past = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  const past = new Date(Date.now() - 160 * 24 * 60 * 60 * 1000);
   const sdate = formatDateYYYYMMDD(past);
   const edate = formatDateYYYYMMDD(new Date());
 
@@ -98,7 +98,7 @@ export async function fetchLST1305Prices(
             t8413InBlock: {
               shcode: rawCode,
               gubun: '2', // 2: 일봉
-              qrycnt: 60,
+              qrycnt: 100,
               sdate: sdate,
               edate: edate,
               cts_date: '',
@@ -135,13 +135,15 @@ export async function fetchLST1305Prices(
               }
             });
 
-            // 오늘 날짜 데이터는 t1102 실시간가가 전달되면 덮어씀
+            // 오늘 날짜 데이터는 t1102 실시간가가 전달되면 덮어씀 (high/low 캔들 왜곡 방지 보정)
             if (externalLivePrice && externalLivePrice > 0) {
               const todayStr = formatDateYYYYMMDD(new Date());
               const formattedToday = `${todayStr.slice(0, 4)}-${todayStr.slice(4, 6)}-${todayStr.slice(6, 8)}`;
               const existing = htsMap.get(formattedToday);
               if (existing) {
                 existing.close = externalLivePrice;
+                if (externalLivePrice > existing.high) existing.high = externalLivePrice;
+                if (existing.low === 0 || externalLivePrice < existing.low) existing.low = externalLivePrice;
               } else {
                 htsMap.set(formattedToday, {
                   close: externalLivePrice,

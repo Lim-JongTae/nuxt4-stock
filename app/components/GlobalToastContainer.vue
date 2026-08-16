@@ -1,5 +1,5 @@
 <template>
-  <div class="fixed top-5 right-5 z-[9999] flex flex-col gap-3 max-w-sm w-full pointer-events-none px-4 sm:px-0">
+  <div class="fixed top-5 right-5 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none px-4 sm:px-0">
     <TransitionGroup name="toast-slide">
       <div 
         v-for="toast in toasts" 

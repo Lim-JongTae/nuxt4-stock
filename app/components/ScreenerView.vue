@@ -348,7 +348,7 @@
           </div>
           <div class="flex flex-wrap items-center gap-4 text-xs">
             <span class="text-slate-300 flex items-center gap-1.5 bg-slate-950/80 px-3 py-1 rounded-lg border border-amber-500/40 shadow-sm">
-              <i class="far fa-clock text-amber-400"></i> 이전 기록 작성 시간: <strong class="text-amber-300 font-mono">{{ screenerStore.oldRecordTime }}</strong>
+              <i class="far fa-clock text-amber-400"></i> 이전 기록 작성 시각: <strong class="text-amber-300 font-mono">{{ screenerStore.oldRecordTime }}</strong>
             </span>
             <span class="text-slate-400 flex items-center gap-1.5 bg-slate-950/60 px-3 py-1 rounded-lg border border-slate-800">
               <i class="fas fa-server text-amber-400"></i> 자료수집처: <strong class="text-slate-200">{{ screenerStore.sourceProvider }}</strong>

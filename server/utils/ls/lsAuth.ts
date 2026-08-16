@@ -21,22 +21,22 @@ export function loadEnv(): Record<string, string> {
   return env;
 }
 
-let cachedToken: { token: string; expiresAt: number } | null = null;
+const tokenCacheMap = new Map<string, { token: string; expiresAt: number }>();
 
-// Helper to clean and parse number safely from LS API strings
+// Helper to clean and parse number safely from LS API strings (preserves negative signs)
 export function parseLSNumber(val: any): number {
   if (val === undefined || val === null) return 0;
   const str = String(val).replace(/[,+\s]/g, '').trim();
   const num = parseFloat(str);
-  return isNaN(num) ? 0 : Math.abs(num);
+  return isNaN(num) ? 0 : num;
 }
 
-// Helper to return undefined for empty/null values while preserving valid 0
+// Helper to return undefined for empty/null values while preserving valid 0 and negative signs
 export function parseLSNumberOrUndefined(val: any): number | undefined {
   if (val === undefined || val === null || String(val).trim() === '') return undefined;
   const str = String(val).replace(/[,+\s]/g, '').trim();
   const num = parseFloat(str);
-  return isNaN(num) ? undefined : Math.abs(num);
+  return isNaN(num) ? undefined : num;
 }
 
 // Domestic Korean Stock Code Validation (Must be exactly 6 characters, e.g. 005930, 0186L0)
@@ -57,14 +57,17 @@ export function formatDateYYYYMMDD(d: Date): string {
   return `${yyyy}${mm}${dd}`;
 }
 
-// OAuth2 Token Fetcher for LS Securities API
+// OAuth2 Token Fetcher for LS Securities API (Support multi-account with Map cache)
 export async function getLSToken(appKey: string, appSecret: string): Promise<{ token: string | null; error: string | null }> {
   if (!appKey || !appSecret) {
     return { token: null, error: 'LS_APP_KEY 또는 LS_SECREAT 환경변수가 .env에 설정되어 있지 않습니다.' };
   }
 
-  if (cachedToken && cachedToken.expiresAt - 60_000 > Date.now()) {
-    return { token: cachedToken.token, error: null };
+  const cacheKey = `${appKey.trim()}:${appSecret.trim()}`;
+  const cached = tokenCacheMap.get(cacheKey);
+
+  if (cached && cached.expiresAt - 60_000 > Date.now()) {
+    return { token: cached.token, error: null };
   }
 
   const urls = [
@@ -91,7 +94,7 @@ export async function getLSToken(appKey: string, appSecret: string): Promise<{ t
         const data = await response.json();
         if (data.access_token) {
           const expiresInMs = (Number(data.expires_in) || 300) * 1000;
-          cachedToken = { token: data.access_token, expiresAt: Date.now() + expiresInMs };
+          tokenCacheMap.set(cacheKey, { token: data.access_token, expiresAt: Date.now() + expiresInMs });
           return { token: data.access_token, error: null };
         }
       } else {

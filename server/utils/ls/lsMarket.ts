@@ -2,7 +2,19 @@ import { parseLSNumber } from './lsAuth';
 
 // 5. Fetch Market Basis & Futures/Options Direction (t2111 / t2424) - 시장 베이시스 동적 수집
 export async function fetchLSMarketBasis(token: string) {
-  if (!token) return null;
+  if (!token) {
+    return {
+      basis: 0.45,
+      basisStatus: '콘탱고 (매수 우위)',
+      futuresPrice: 365.20,
+      kospi200Index: 364.75,
+      oi: 315400,
+      programNetBuy: 1245,
+      vkospi: 18.2,
+      updatedAt: new Date().toLocaleString('ko-KR'),
+      dataSource: 'fallback' as const
+    };
+  }
 
   const urls = [
     'https://openapi.ls-sec.co.kr:8080/future/market-data',
@@ -35,15 +47,25 @@ export async function fetchLSMarketBasis(token: string) {
         if (block) {
           const futuresPrice = parseLSNumber(block.price || block.futsise || block.close);
           const kospi200Index = parseLSNumber(block.k200val || block.k200 || block.k202val);
-          const rawBasis = parseFloat(String(block.sbasis || block.cbasis || (futuresPrice - kospi200Index)));
-          const basis = isNaN(rawBasis) ? Math.round((futuresPrice - kospi200Index) * 100) / 100 : Math.round(rawBasis * 100) / 100;
+
+          // sbasis가 숫자 0인 경우에도 falsy로 유실되지 않도록 nullish coalescing 및 명시적 체크
+          const sbasisRaw = block.sbasis !== undefined && block.sbasis !== null && String(block.sbasis).trim() !== ''
+            ? parseFloat(String(block.sbasis))
+            : (block.cbasis !== undefined && block.cbasis !== null && String(block.cbasis).trim() !== ''
+              ? parseFloat(String(block.cbasis))
+              : (futuresPrice > 0 && kospi200Index > 0 ? futuresPrice - kospi200Index : 0));
+
+          const basis = isNaN(sbasisRaw) ? 0 : Math.round(sbasisRaw * 100) / 100;
           const oi = parseLSNumber(block.openyak || block.open_interest);
           const programNetBuy = parseLSNumber(block.netbuy || block.pgm_net);
-          const vkospi = parseLSNumber(block.vkospi || 18.5);
+          const vkospi = parseLSNumber(block.vkospi) || 18.5;
 
           let basisStatus = '보합';
           if (basis > 0.05) basisStatus = '콘탱고 (매수 우위)';
           else if (basis < -0.05) basisStatus = '백워데이션 (경계)';
+
+          // 주요 실시간 지표(선물가격, 코스피200지수) 파싱 유효성 엄격 검명
+          const isLiveValid = futuresPrice > 0 && kospi200Index > 0;
 
           return {
             basis,
@@ -52,15 +74,16 @@ export async function fetchLSMarketBasis(token: string) {
             kospi200Index: kospi200Index > 0 ? kospi200Index : 364.75,
             oi: oi > 0 ? oi : 315400,
             programNetBuy,
-            vkospi: vkospi > 0 ? vkospi : 18.5,
-            updatedAt: new Date().toLocaleString('ko-KR')
+            vkospi,
+            updatedAt: new Date().toLocaleString('ko-KR'),
+            dataSource: isLiveValid ? ('live' as const) : ('fallback' as const)
           };
         }
       }
     } catch (e: any) {}
   }
 
-  // Fallback: LS증권 시세 수집 기반 동적 계산
+  // Fallback: LS증권 시세 수집 실패 시 폴백 표기
   return {
     basis: 0.45,
     basisStatus: '콘탱고 (매수 우위)',
@@ -69,11 +92,12 @@ export async function fetchLSMarketBasis(token: string) {
     oi: 315400,
     programNetBuy: 1245,
     vkospi: 18.2,
-    updatedAt: new Date().toLocaleString('ko-KR')
+    updatedAt: new Date().toLocaleString('ko-KR'),
+    dataSource: 'fallback' as const
   };
 }
 
-// 6. Fetch Top 5 Rising & Bottom 5 Declining Sectors via LS API (t8424 / t1531) - 상승/하락 5대 업종 수집
+// 6. Fetch Top 5 Rising & Bottom 5 Declining Sectors via LS API (t8424 / t1531) - 상승/하락 5대 업종 수집 (동시성 배치 제어 적용)
 export async function fetchLSSectorData(token: string): Promise<{
   topSectors: Array<{ code: string; name: string; rate: number }>;
   bottomSectors: Array<{ code: string; name: string; rate: number }>;
@@ -149,48 +173,56 @@ export async function fetchLSSectorData(token: string): Promise<{
             }
           });
 
-          // t1531 TR을 통해 각 업종별 실시간 등락율(diff, sign) 병열 수집
-          const sectorPrices = await Promise.allSettled(
-            validSectors.map(async (sec) => {
-              try {
-                const t1531Res = await fetch(url, {
-                  method: 'POST',
-                  headers: {
-                    'content-type': 'application/json; charset=utf-8',
-                    'authorization': 'Bearer ' + token,
-                    'tr_cd': 't1531',
-                    'tr_cont': 'N'
-                  },
-                  body: JSON.stringify({
-                    t1531InBlock: { upcode: sec.code }
-                  }),
-                  signal: AbortSignal.timeout(3000)
-                });
-
-                if (t1531Res.ok) {
-                  const t1531Data = await t1531Res.json();
-                  const block = t1531Data.t1531OutBlock || t1531Data;
-                  if (block) {
-                    const rawDiff = parseFloat(String(block.diff || block.chgrate || 0));
-                    const sign = String(block.sign || '').trim();
-                    const isNeg = sign === '4' || sign === '5' || sign === '-';
-                    const rate = isNeg ? -Math.abs(rawDiff) : Math.abs(rawDiff);
-                    return { code: sec.code, name: sec.name, rate };
-                  }
-                }
-              } catch (e: any) {
-                console.warn(`⚠️ [LS증권 t1531 업종 시세 개별 수신 실패 - ${sec.code}]:`, e.message || String(e));
-              }
-              return null;
-            })
-          );
-
+          // LS증권 API 초당 건수 제한 방지: 3개씩 배치 처리 및 150ms 지연
           const parsedList: Array<{ code: string; name: string; rate: number }> = [];
-          sectorPrices.forEach((res) => {
-            if (res.status === 'fulfilled' && res.value) {
-              parsedList.push(res.value);
+          const BATCH_SIZE = 3;
+          for (let i = 0; i < validSectors.length; i += BATCH_SIZE) {
+            const batch = validSectors.slice(i, i + BATCH_SIZE);
+            const results = await Promise.allSettled(
+              batch.map(async (sec) => {
+                try {
+                  const t1531Res = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                      'content-type': 'application/json; charset=utf-8',
+                      'authorization': 'Bearer ' + token,
+                      'tr_cd': 't1531',
+                      'tr_cont': 'N'
+                    },
+                    body: JSON.stringify({
+                      t1531InBlock: { upcode: sec.code }
+                    }),
+                    signal: AbortSignal.timeout(3000)
+                  });
+
+                  if (t1531Res.ok) {
+                    const t1531Data = await t1531Res.json();
+                    const block = t1531Data.t1531OutBlock || t1531Data;
+                    if (block) {
+                      const rawDiff = parseFloat(String(block.diff || block.chgrate || 0));
+                      const sign = String(block.sign || '').trim();
+                      const isNeg = sign === '4' || sign === '5' || sign === '-';
+                      const rate = isNeg ? -Math.abs(rawDiff) : Math.abs(rawDiff);
+                      return { code: sec.code, name: sec.name, rate };
+                    }
+                  }
+                } catch (e: any) {
+                  console.warn(`⚠️ [LS증권 t1531 업종 시세 수신 실패 - ${sec.code}]:`, e.message || String(e));
+                }
+                return null;
+              })
+            );
+
+            results.forEach((res) => {
+              if (res.status === 'fulfilled' && res.value) {
+                parsedList.push(res.value);
+              }
+            });
+
+            if (i + BATCH_SIZE < validSectors.length) {
+              await new Promise(r => setTimeout(r, 150));
             }
-          });
+          }
 
           if (parsedList.length >= 5) {
             const topSectors = [...parsedList].sort((a, b) => b.rate - a.rate).slice(0, 5);

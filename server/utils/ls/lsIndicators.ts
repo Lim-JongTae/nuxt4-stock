@@ -101,29 +101,106 @@ export function calculateTechnicalIndicators(
     }
   }
 
-  // 6. MACD 오실레이터 (12, 26, 9)
+  // 6. MACD 오실레이터 표준 계산 (SMA 시드 기반 12/26일 EMA MACD선 - 9일 EMA 시그널선)
   let macdHist: number | null = null;
   if (n >= 35) {
-    const calcEMA = (data: number[], period: number): number => {
-      if (data.length === 0) return 0;
-      const k = 2 / (period + 1);
-      let ema = data[0] ?? 0;
-      for (let i = 1; i < data.length; i++) {
-        const val = data[i] ?? 0;
-        ema = val * k + ema * (1 - k);
+    const k12 = 2 / (12 + 1);
+    const k26 = 2 / (26 + 1);
+    const k9 = 2 / (9 + 1);
+
+    // 1) EMA12 및 EMA26 계산 (초기 12일/26일 SMA 시드 설정으로 초기 편향 완벽 제거)
+    const sma12 = closes.slice(0, 12).reduce((a, b) => a + b, 0) / 12;
+    const sma26 = closes.slice(0, 26).reduce((a, b) => a + b, 0) / 26;
+
+    const ema12Series: number[] = new Array(n).fill(0);
+    const ema26Series: number[] = new Array(n).fill(0);
+
+    let currEma12 = sma12;
+    let currEma26 = sma26;
+
+    for (let i = 0; i < n; i++) {
+      const price = closes[i] ?? 0;
+      if (i >= 12) {
+        currEma12 = price * k12 + currEma12 * (1 - k12);
       }
-      return ema;
-    };
-    const ema12 = calcEMA(closes, 12);
-    const ema26 = calcEMA(closes, 26);
-    const macdLine = ema12 - ema26;
-    macdHist = Math.round(macdLine * 0.4);
+      if (i >= 26) {
+        currEma26 = price * k26 + currEma26 * (1 - k26);
+      }
+      ema12Series[i] = currEma12;
+      ema26Series[i] = currEma26;
+    }
+
+    // 2) MACD Line 시계열 생성 (인덱스 25부터 시작)
+    const macdSeries: number[] = [];
+    for (let i = 25; i < n; i++) {
+      macdSeries.push((ema12Series[i] ?? 0) - (ema26Series[i] ?? 0));
+    }
+
+    // 3) Signal Line (9일 EMA) 계산 (MACD Line의 첫 9일 SMA 시드)
+    if (macdSeries.length >= 9) {
+      const signalSma9 = macdSeries.slice(0, 9).reduce((a, b) => a + b, 0) / 9;
+      let currSignal = signalSma9;
+
+      for (let i = 9; i < macdSeries.length; i++) {
+        const m = macdSeries[i] ?? 0;
+        currSignal = m * k9 + currSignal * (1 - k9);
+      }
+
+      const latestMacdLine = macdSeries[macdSeries.length - 1] ?? 0;
+      macdHist = Math.round(latestMacdLine - currSignal);
+    }
   }
 
-  // 7. 강세 다이버전스 (bullishDivergence)
+  // 7. 강세 다이버전스 (Bullish Divergence): 주가는 신저점을 갱신(Lower Low)하지만 RSI 지표는 저점을 높일 때(Higher Low)
+  // (RSI 14일 계산 + 20일 분석 구간을 확보하기 위해 최소 n >= 34 필요)
   let bullishDivergence: boolean | null = null;
-  if (rsi !== null && psy !== null) {
-    bullishDivergence = rsi <= 35 && psy <= 25;
+  if (n >= 34) {
+    // 14일 RSI 시계열 생성 (인덱스 14부터 n-1까지)
+    const rsiSeries: (number | null)[] = new Array(n).fill(null);
+    for (let i = 14; i < n; i++) {
+      let gains = 0;
+      let losses = 0;
+      for (let j = i - 13; j <= i; j++) {
+        const diff = (closes[j] ?? 0) - (closes[j - 1] ?? 0);
+        if (diff > 0) gains += diff;
+        else losses += Math.abs(diff);
+      }
+      const avgGain = gains / 14;
+      const avgLoss = losses / 14;
+      if (avgGain + avgLoss > 0) {
+        rsiSeries[i] = Number(((avgGain / (avgGain + avgLoss)) * 100).toFixed(1));
+      } else {
+        rsiSeries[i] = 50;
+      }
+    }
+
+    // 최근 20일 데이터를 전반 10일(구간 A: n-20 ~ n-11)과 후반 10일(구간 B: n-10 ~ n-1)로 분할
+    let minPriceA = Infinity;
+    let rsiAtMinA = 50;
+    for (let i = n - 20; i <= n - 11; i++) {
+      const price = closes[i] ?? Infinity;
+      const rVal = rsiSeries[i] ?? 50;
+      if (price < minPriceA) {
+        minPriceA = price;
+        rsiAtMinA = rVal;
+      }
+    }
+
+    let minPriceB = Infinity;
+    let rsiAtMinB = 50;
+    for (let i = n - 10; i <= n - 1; i++) {
+      const price = closes[i] ?? Infinity;
+      const rVal = rsiSeries[i] ?? 50;
+      if (price < minPriceB) {
+        minPriceB = price;
+        rsiAtMinB = rVal;
+      }
+    }
+
+    // 주가 신저점 하락(Lower Low) + RSI 지표 저점 상승(Higher Low) + RSI 45 이하 침체 영역 조건 검사
+    bullishDivergence = minPriceB < minPriceA && rsiAtMinB > rsiAtMinA && rsiAtMinB <= 45;
+  } else {
+    bullishDivergence = false;
   }
 
   return { psy, bbLower, ma5, ma20, ma60, volumeRatio, macdHist, rsi, bullishDivergence };

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import type { HoldingItem } from '../../utils/types/lsSecurities';
 import { useLSStockRawStore } from './useLSStockRawStore';
 import { useScreenerStore } from './useScreenerStore';
+import { getLivePrice, arrayToMap, arrayToIndexMap, sanitizeShcode } from '../../utils/stockUtils';
 
 export const usePortfolioStore = defineStore('portfolio', {
   state: () => ({
@@ -18,36 +19,41 @@ export const usePortfolioStore = defineStore('portfolio', {
       const rawStore = useLSStockRawStore();
       const list = state.holdings.length > 0 ? state.holdings : rawStore.holdingsList;
       return list.reduce((sum, item) => {
-        const price = Number(item.avgPrice ?? (item as any).holdingAvgPrice) || 0;
-        const qty = Number(item.quantity ?? (item as any).holdingQuantity) || 0;
+        const price = Number(item.avgPrice ?? item.holdingAvgPrice) || 0;
+        const qty = Number(item.quantity ?? item.holdingQuantity) || 0;
         return sum + (price * qty);
       }, 0);
     },
+
     totalValuationAmount: (state) => {
       const rawStore = useLSStockRawStore();
       const screenerStore = useScreenerStore();
       const list = state.holdings.length > 0 ? state.holdings : rawStore.holdingsList;
 
-      return list.reduce((sum, item) => {
-        const rawStock = rawStore.rawStockMap.get(item.shcode);
-        const screenerStock = screenerStore.newData.find(s => s.shcode === item.shcode);
-        const livePrice = (rawStock?.closePrice && rawStock.closePrice > 0)
-          ? rawStock.closePrice
-          : (screenerStock?.closePrice && screenerStock.closePrice > 0)
-            ? screenerStock.closePrice
-            : (Number(item.currentPrice) > 0 ? Number(item.currentPrice) : Number((item as any).holdingAvgPrice || item.avgPrice)) || 0;
+      // ✅ 성능 최적화: Map으로 O(1) 조회
+      const screenerMap = arrayToMap(screenerStore.newData);
 
-        const qty = Number(item.quantity ?? (item as any).holdingQuantity) || 0;
+      return list.reduce((sum, item) => {
+        const cleanCode = sanitizeShcode(item.shcode);
+        const rawStock = rawStore.rawStockMap.get(cleanCode);
+        const screenerStock = screenerMap.get(cleanCode);
+
+        // ✅ 유틸 함수 사용: 4단계 Fallback을 1줄로
+        const livePrice = getLivePrice(item, rawStock, screenerStock);
+        const qty = Number(item.quantity ?? item.holdingQuantity) || 0;
         return sum + (livePrice * qty);
       }, 0);
     },
+
     totalPnlAmount(): number {
       return this.totalValuationAmount - this.totalPurchaseAmount;
     },
+
     totalPnlRate(): number {
       if (this.totalPurchaseAmount === 0) return 0;
       return Math.round((this.totalPnlAmount / this.totalPurchaseAmount) * 10000) / 100;
     },
+
     // Alias getters for DashboardView compatibility
     totalInvested(): number {
       return this.totalPurchaseAmount;
@@ -66,27 +72,30 @@ export const usePortfolioStore = defineStore('portfolio', {
   actions: {
     async fetchHoldings(forceRefresh = false) {
       if (!forceRefresh && this.holdings.length > 0) return;
+
       this.isLoading = true;
       this.errorMessage = null;
+
       try {
         const rawStore = useLSStockRawStore();
         const screenerStore = useScreenerStore();
-        
-        // Screener 시세 수집이 완료되지 않았으면 로드
+
         if (!rawStore.hasRawData) {
           await screenerStore.loadInitial(false);
         }
 
         const data = await $fetch<HoldingItem[]>(`/api/holdings?ts=${Date.now()}`);
+
         if (data && Array.isArray(data) && data.length > 0) {
+          // ✅ 성능 최적화: Map으로 O(1) 조회
+          const screenerMap = arrayToMap(screenerStore.newData);
+
           this.holdings = data.map(h => {
             const rawStock = rawStore.rawStockMap.get(h.shcode);
-            const screenerStock = screenerStore.newData.find(s => s.shcode === h.shcode);
-            const livePrice = (rawStock?.closePrice && rawStock.closePrice > 0)
-              ? rawStock.closePrice
-              : (screenerStock?.closePrice && screenerStock.closePrice > 0)
-                ? screenerStock.closePrice
-                : (Number(h.currentPrice) > 0 ? Number(h.currentPrice) : Number(h.avgPrice));
+            const screenerStock = screenerMap.get(h.shcode);
+
+            // ✅ 유틸 함수 사용
+            const livePrice = getLivePrice(h, rawStock, screenerStock);
 
             return {
               ...h,
@@ -116,16 +125,20 @@ export const usePortfolioStore = defineStore('portfolio', {
         this.isLoading = false;
       }
     },
-    // 실시간 시세와 목표·손절가를 LS증권 API 로 갱신
+
     async refreshPrices() {
       this.isLoading = true;
       this.errorMessage = null;
+
       try {
         const data = await $fetch<any>('/api/holdings/price');
         if (data && Array.isArray(data)) {
+          // ✅ 성능 최적화: Map으로 O(n²) → O(n)
+          const holdingsMap = arrayToIndexMap(this.holdings);
+
           data.forEach((p: any) => {
-            const idx = this.holdings.findIndex(h => h.shcode === p.shcode);
-            if (idx !== -1 && this.holdings[idx]) {
+            const idx = holdingsMap.get(p.shcode);
+            if (idx !== undefined && this.holdings[idx]) {
               const h = this.holdings[idx];
               h.currentPrice = Number(p.currentPrice) || h.currentPrice || h.avgPrice;
               h.targetPrice = Number(p.targetPrice) || h.targetPrice;

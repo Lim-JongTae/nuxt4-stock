@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { useLSStockRawStore } from './useLSStockRawStore';
 import { calculateQuantIndicators } from '../composables/useQuantIndicatorCalculator';
+import { isEtfOrEtn, arrayToMap, safeLocalStorageSet, safeLocalStorageGet, sanitizeShcode } from '../../utils/stockUtils';
 
 export interface WatchItem {
   shcode: string;
@@ -42,59 +43,50 @@ export const useWatchlistStore = defineStore('watchlist', {
 
   actions: {
     initFromStorage() {
-      if (typeof window === 'undefined') return;
-      try {
-        const now = Date.now();
-        const validDailyKeys: string[] = [];
+      const keys: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(WATCHLIST_KEY_PREFIX)) {
+          keys.push(k);
+        }
+      }
 
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && (key.startsWith(WATCHLIST_KEY_PREFIX) || key.startsWith('nuxt4_watchlist_cache'))) {
-            const raw = localStorage.getItem(key);
-            if (raw) {
-              try {
-                const parsed = JSON.parse(raw);
-                if (parsed.cachedTimestamp && now - parsed.cachedTimestamp > EXPIRATION_MS) {
-                  localStorage.removeItem(key);
-                } else if (key.startsWith(WATCHLIST_KEY_PREFIX)) {
-                  validDailyKeys.push(key);
-                }
-              } catch (e) {
-                localStorage.removeItem(key);
-              }
-            }
+      const now = Date.now();
+      for (const key of keys) {
+        const cached = safeLocalStorageGet<{ items: WatchItem[]; cachedTimestamp: number }>(key);
+        if (cached?.cachedTimestamp && now - cached.cachedTimestamp > EXPIRATION_MS) {
+          localStorage.removeItem(key);
+        }
+      }
+
+      const todayKey = getTodayWatchlistKey();
+      const todayData = safeLocalStorageGet<{ items: WatchItem[]; cachedTimestamp: number }>(todayKey);
+
+      if (todayData && todayData.items && Array.isArray(todayData.items)) {
+        this.items = todayData.items;
+      } else {
+        const validKeys = keys.filter(k => {
+          const cached = safeLocalStorageGet<{ cachedTimestamp: number }>(k);
+          return cached?.cachedTimestamp && now - cached.cachedTimestamp <= EXPIRATION_MS;
+        }).sort();
+
+        if (validKeys.length > 0) {
+          const latestKey = validKeys[validKeys.length - 1];
+          const latestData = safeLocalStorageGet<{ items: WatchItem[] }>(latestKey);
+          if (latestData?.items && Array.isArray(latestData.items)) {
+            this.items = latestData.items;
           }
         }
-
-        const todayKey = getTodayWatchlistKey();
-        const targetKey = localStorage.getItem(todayKey) ? todayKey : (validDailyKeys.sort().pop() || todayKey);
-        const saved = localStorage.getItem(targetKey);
-
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            this.items = parsed;
-          }
-        }
-      } catch (e) {
-        console.error('Failed to load watchlist cache from storage:', e);
       }
     },
 
     saveToStorage() {
-      if (typeof window === 'undefined') return;
-      try {
-        const todayKey = getTodayWatchlistKey();
-        const payload = JSON.stringify(
-          this.items.map(item => ({
-            ...item,
-            cachedTimestamp: Date.now()
-          }))
-        );
-        localStorage.setItem(todayKey, payload);
-      } catch (e) {
-        console.error('Failed to save watchlist cache to storage:', e);
-      }
+      const todayKey = getTodayWatchlistKey();
+      const data = {
+        items: this.items,
+        cachedTimestamp: Date.now()
+      };
+      safeLocalStorageSet(todayKey, data);
     },
 
     async loadInitial(forceRefresh = false) {
@@ -112,49 +104,48 @@ export const useWatchlistStore = defineStore('watchlist', {
 
     async refresh() {
       this.isLoading = true;
-      this.errorMessage = null;
       try {
         const rawStore = useLSStockRawStore();
         await rawStore.fetchRawStockData(true);
 
         if (rawStore.rawStockList && rawStore.rawStockList.length > 0) {
-          const etfKeywords = ['KODEX', 'TIGER', 'ACE', 'SOL', 'RISE', 'KoAct', 'PLUS', 'HANARO', 'WOORI', 'UNICORN', 'TIMEFOLIO', 'HERO', 'KBSTAR', 'ARIRANG', 'ETF', 'ETN'];
+          // ✅ 성능 최적화: Map으로 O(1) 조회
+          const itemsMap = arrayToMap(this.items);
 
           rawStore.rawStockList.forEach(sc => {
-            const isEtf = (sc.industry || '').includes('ETF') || (sc.industry || '').includes('ETN') || etfKeywords.some(k => (sc.name || '').includes(k));
+            // ✅ 유틸 함수 사용: ETF 판별
+            const isEtf = isEtfOrEtn(sc.name, sc.industry);
+
             const quantResult = calculateQuantIndicators({
               shcode: sc.shcode,
               name: sc.name,
-              industry: sc.industry,
-              isHolding: !!sc.isHolding,
-              holdingQuantity: sc.holdingQuantity ?? sc.quantity,
-              holdingAvgPrice: sc.holdingAvgPrice ?? sc.avgPrice,
-              closePrice: sc.closePrice,
-              psy: sc.psy ?? null,
-              bbLower: sc.bbLower ?? null,
-              ma5: sc.ma5 ?? null,
-              ma20: sc.ma20 ?? null,
-              ma60: sc.ma60 ?? null,
-              volumeRatio: sc.volumeRatio ?? null,
-              macdHist: sc.macdHist ?? null,
-              rsi: sc.rsi ?? null,
-              bullishDivergence: sc.bullishDivergence ?? null,
-              shortSellHistory: sc.shortSellHistory || [],
-              dataSource: sc.dataSource || 'LS증권 Open API'
+              industry: sc.industry || '주요업종',
+              closePrice: sc.closePrice || 0,
+              psy: sc.psy,
+              bbLower: sc.bbLower,
+              ma5: sc.ma5,
+              ma20: sc.ma20,
+              ma60: sc.ma60,
+              volumeRatio: sc.volumeRatio,
+              macdHist: sc.macdHist,
+              rsi: sc.rsi,
+              bullishDivergence: sc.bullishDivergence,
+              shortSellHistory: sc.shortSellHistory || []
             });
 
-            const shortSellingStatus = isEtf ? 'ETF/ETN (공매도 t1927 제외 종목)' : (quantResult.shortSignal.label || sc.shortSellingStatus || '판단 보류');
+            const shortSellingStatus = isEtf
+              ? 'ETF/ETN (공매도 t1927 제외 종목)'
+              : quantResult.shortSignal.label;
             const score = quantResult.score;
 
-            const idx = this.items.findIndex(it => it.shcode === sc.shcode);
-            if (idx !== -1) {
-              const it = this.items[idx]!;
-              it.currentPrice = sc.closePrice || it.currentPrice;
-              it.psy = sc.psy ?? it.psy;
-              it.volumeRatio = sc.volumeRatio ?? it.volumeRatio;
-              it.shortSellingStatus = shortSellingStatus;
-              it.score = score;
-              it.updatedAt = rawStore.lastUpdated;
+            const existing = itemsMap.get(sc.shcode);
+            if (existing) {
+              existing.currentPrice = sc.closePrice || existing.currentPrice;
+              existing.psy = sc.psy ?? existing.psy;
+              existing.volumeRatio = sc.volumeRatio;
+              existing.shortSellingStatus = shortSellingStatus;
+              existing.score = score;
+              existing.updatedAt = rawStore.lastUpdated;
             } else {
               this.items.push({
                 shcode: sc.shcode,
@@ -176,6 +167,18 @@ export const useWatchlistStore = defineStore('watchlist', {
         this.errorMessage = err.message || 'LS증권 실시간 시세 및 8대 지표 갱신 실패';
       } finally {
         this.isLoading = false;
+      }
+    },
+
+    async removeItem(shcode: string) {
+      const cleanCode = sanitizeShcode(shcode);
+      this.items = this.items.filter(it => it.shcode !== cleanCode);
+      this.saveToStorage();
+
+      try {
+        await $fetch(`/api/watchlist/${cleanCode}`, { method: 'DELETE' });
+      } catch (err) {
+        console.error('Remove watchlist item error:', err);
       }
     }
   }

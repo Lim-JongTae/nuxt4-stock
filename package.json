@@ -7,7 +7,10 @@
     "dev": "npx nuxt dev",
     "generate": "npx nuxt generate",
     "preview": "npx nuxt preview",
-    "postinstall": "npx nuxt prepare"
+    "postinstall": "npx nuxt prepare",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage"
   },
   "dependencies": {
     "@nuxt/ui": "^4.10.0",
@@ -42,6 +45,8 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
-    "drizzle-kit": "^0.31.10"
+    "@vitest/ui": "^4.1.10",
+    "drizzle-kit": "^0.18.1",
+    "vitest": "^4.1.10"
   }
 }

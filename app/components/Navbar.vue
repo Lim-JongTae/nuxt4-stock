@@ -4,11 +4,11 @@
       
       <!-- Logo Brand -->
       <NuxtLink to="/" class="flex items-center space-x-3 group">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:scale-105 transition-all">
-          <i class="fas fa-chart-line text-white text-lg"></i>
+        <div class="w-9 h-9 rounded-xl overflow-hidden shadow-lg shadow-indigo-500/20 group-hover:scale-105 transition-all flex items-center justify-center bg-slate-900 border border-slate-700/60 p-0.5">
+          <img src="/icon.jpeg" alt="Stock AI Portal Logo" class="w-full h-full object-cover rounded-lg" />
         </div>
         <div>
-          <h1 class="text-base font-extrabold bg-gradient-to-r from-white via-slate-200 to-indigo-300 bg-clip-text text-transparent tracking-tight">
+          <h1 class="text-base font-extrabold bg-linear-to-r from-white via-slate-200 to-indigo-300 bg-clip-text text-transparent tracking-tight">
             Stock AI Portal <span class="text-xs px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">Nuxt 4</span>
           </h1>
           <p class="text-[10px] text-slate-400">LS증권 Open API & Anthropic Claude 퀀트 시스템</p>

@@ -232,6 +232,7 @@ export interface StockItem {
   isFullyMatched: boolean;
   shortSellHistory?: ShortSellRecord[];
   dataSource?: string;
+  errorMessage?: string | null;
   createdAt: string;
 }
 
@@ -245,6 +246,7 @@ export interface MarketBasisInfo {
   programNetBuy: number;
   vkospi: number;
   updatedAt: string;
+  dataSource?: 'live' | 'fallback';
 }
 
 // 15. LS증권 상위 상승 유망 업종 타입 (t8424 / t1531)

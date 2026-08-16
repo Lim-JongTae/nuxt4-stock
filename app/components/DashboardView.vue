@@ -6,8 +6,9 @@
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div>
           <div class="flex items-center gap-2 mb-2">
-            <span class="px-2.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 font-bold text-xs">
-              <i class="fas fa-chart-pie mr-1"></i> 메인 대시보드 Overview
+            <span class="px-2.5 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-bold text-xs flex items-center gap-1.5">
+              <img src="/icon.jpeg" alt="Logo" class="w-4 h-4 rounded-sm object-cover" />
+              <span>메인 대시보드 Overview</span>
             </span>
             <span class="px-2.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-bold text-xs flex items-center gap-1.5">
               <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>

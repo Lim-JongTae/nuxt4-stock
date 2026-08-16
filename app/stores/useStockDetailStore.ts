@@ -1,6 +1,8 @@
 import { defineStore } from 'pinia';
 import { calculateQuantIndicators } from '../composables/useQuantIndicatorCalculator';
 import type { ShortSellRecord, StockDetailStateItem } from '../../utils/types/lsSecurities';
+import { sanitizeShcode, safeLocalStorageSet, safeLocalStorageGet } from '../../utils/stockUtils';
+import { useLSStockRawStore } from './useLSStockRawStore';
 
 const DETAIL_KEY_PREFIX = 'nuxt_stock_detail_';
 const EXPIRATION_MS = 5 * 24 * 60 * 60 * 1000; // 5일 보존 정책 (주식 거래일 1주일 기준)
@@ -21,73 +23,62 @@ export const useStockDetailStore = defineStore('stockDetail', {
   }),
 
   actions: {
-    // 1. LocalStorage에서 종목 상세 캐시 불러오기 (1일 1개 보존 & 15일 이상 경과 데이터만 자동 정리)
     initFromStorage() {
-      if (typeof window === 'undefined') return;
-      try {
-        const now = Date.now();
-        const validDailyKeys: string[] = [];
+      const keys: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(DETAIL_KEY_PREFIX)) {
+          keys.push(k);
+        }
+      }
 
-        // 15일 이상 경과된 과거 일별 키만 자동 삭제
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && (key.startsWith(DETAIL_KEY_PREFIX) || key.startsWith('nuxt4_stock_detail_cache'))) {
-            const raw = localStorage.getItem(key);
-            if (raw) {
-              try {
-                const parsed = JSON.parse(raw);
-                if (parsed.cachedTimestamp && now - parsed.cachedTimestamp > EXPIRATION_MS) {
-                  localStorage.removeItem(key); // 15일 초과 시에만 삭제
-                } else if (key.startsWith(DETAIL_KEY_PREFIX)) {
-                  validDailyKeys.push(key);
-                }
-              } catch (e) {
-                localStorage.removeItem(key);
-              }
+      const now = Date.now();
+      let hasExpired = false;
+
+      for (const key of keys) {
+        const cached = safeLocalStorageGet<Record<string, StockDetailStateItem>>(key);
+        if (cached) {
+          const cleanedCache = this.cleanExpiredItems(cached, now);
+
+          if (Object.keys(cleanedCache).length !== Object.keys(cached).length) {
+            hasExpired = true;
+            if (Object.keys(cleanedCache).length > 0) {
+              safeLocalStorageSet(key, cleanedCache);
+            } else {
+              localStorage.removeItem(key);
             }
           }
+
+          Object.assign(this.stockCache, cleanedCache);
         }
+      }
 
-        const todayKey = getTodayDetailKey();
-        const targetKey = localStorage.getItem(todayKey) ? todayKey : (validDailyKeys.sort().pop() || todayKey);
-        const saved = localStorage.getItem(targetKey);
+      const todayKey = getTodayDetailKey();
+      const todayData = safeLocalStorageGet<Record<string, StockDetailStateItem>>(todayKey);
 
-        if (saved) {
-          const parsed = JSON.parse(saved) || {};
-          let hasExpired = false;
-
-          Object.keys(parsed).forEach((key) => {
-            const item = parsed[key];
-            if (item && item.cachedTimestamp && now - item.cachedTimestamp > EXPIRATION_MS) {
-              delete parsed[key];
-              hasExpired = true;
-            }
-          });
-
-          this.stockCache = parsed;
-          if (hasExpired) {
-            this.saveToStorage();
-          }
-        }
-      } catch (e) {
-        console.error('Failed to load stock detail cache:', e);
+      if (todayData && Object.keys(todayData).length > 0) {
+        Object.assign(this.stockCache, todayData);
       }
     },
 
-    // 2. LocalStorage에 당일 1일 1개 덮어쓰기 저장
+    cleanExpiredItems(cache: Record<string, StockDetailStateItem>, now: number): Record<string, StockDetailStateItem> {
+      const cleaned: Record<string, StockDetailStateItem> = {};
+      Object.keys(cache).forEach((key) => {
+        const item = cache[key];
+        if (item && (!item.cachedTimestamp || now - item.cachedTimestamp <= EXPIRATION_MS)) {
+          cleaned[key] = item;
+        }
+      });
+      return cleaned;
+    },
+
     saveToStorage() {
-      if (typeof window === 'undefined') return;
-      try {
-        const todayKey = getTodayDetailKey();
-        localStorage.setItem(todayKey, JSON.stringify(this.stockCache));
-      } catch (e) {
-        console.error('Failed to save stock detail cache:', e);
-      }
+      const todayKey = getTodayDetailKey();
+      safeLocalStorageSet(todayKey, this.stockCache);
     },
 
-    // 3. 특정 종목 캐시 데이터 가져오기 (15일 유효성 검사 - 15일 이상 자동 제거)
     getStockCache(shcode: string): StockDetailStateItem | null {
-      const cleanCode = String(shcode).trim().replace(/^A/i, '');
+      const cleanCode = sanitizeShcode(shcode);
       const item = this.stockCache[cleanCode];
       if (!item) return null;
 
@@ -99,39 +90,31 @@ export const useStockDetailStore = defineStore('stockDetail', {
       return item;
     },
 
-    // 4. 종목 데이터 업데이트 및 LocalStorage 15일 보존
     updateStockCache(shcode: string, data: StockDetailStateItem) {
-      const cleanCode = String(shcode).trim().replace(/^A/i, '');
+      const cleanCode = sanitizeShcode(shcode);
       this.stockCache[cleanCode] = {
         ...data,
-        cachedTimestamp: Date.now(),
-        updatedAt: new Date().toLocaleString('ko-KR')
+        cachedTimestamp: Date.now()
       };
       this.saveToStorage();
     },
 
-    // 5. API 중앙 수집, Pinia 스토어 갱신 & 15일 LocalStorage 보존
     async fetchAndCacheStock(shcode: string, forceRefresh = false): Promise<StockDetailStateItem | null> {
-      const cleanCode = String(shcode).trim().replace(/^A/i, '');
-      
-      // 1. [평상시] forceRefresh가 false이고 유효한 Pinia/LocalStorage 데이터가 있으면 0ms 즉시 반환 (API 토큰 아낌)
+      const cleanCode = sanitizeShcode(shcode);
+
       if (!forceRefresh) {
         const cached = this.getStockCache(cleanCode);
         if (cached) return cached;
       }
 
       this.isFetching = true;
-      this.errorMessage = null;
 
       try {
-        // 2. [새로고침 요청 시 또는 데이터 미보유 시만] 중앙 통신 API 호출
         const res = await $fetch<{ success: boolean; data: any }>(`/api/stock/${cleanCode}`);
         if (res && res.success && res.data) {
           const calculatedData = calculateQuantIndicators(res.data);
           this.updateStockCache(cleanCode, calculatedData);
           return calculatedData;
-        } else {
-          this.errorMessage = '종목 상세 데이터를 불러오지 못했습니다.';
         }
       } catch (err: any) {
         console.error('Fetch and cache stock error:', err);
@@ -142,10 +125,21 @@ export const useStockDetailStore = defineStore('stockDetail', {
       return this.getStockCache(cleanCode);
     },
 
-    // 6. 생성된 AI 보고서 스토어 및 LocalStorage 저장
     saveAiReport(shcode: string, reportText: string) {
-      const cleanCode = String(shcode).trim().replace(/^A/i, '');
-      const existing = this.stockCache[cleanCode] || { shcode: cleanCode, name: cleanCode, industry: '기타', closePrice: 0, isHolding: false, score: 0, isFullyMatched: false, conditions: {} };
+      const cleanCode = sanitizeShcode(shcode);
+      const rawStore = useLSStockRawStore();
+      const rawStock = rawStore.rawStockMap.get(cleanCode);
+
+      const existing = this.stockCache[cleanCode] || {
+        shcode: cleanCode,
+        name: rawStock?.name || cleanCode,
+        industry: rawStock?.industry || '기타',
+        closePrice: rawStock?.closePrice || 0,
+        isHolding: rawStock?.isHolding || false,
+        score: 0,
+        isFullyMatched: false,
+        conditions: {}
+      };
       this.stockCache[cleanCode] = {
         ...existing,
         generatedReport: reportText,

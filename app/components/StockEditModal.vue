@@ -515,14 +515,22 @@ async function submitForm() {
 
   try {
     const rawStore = useLSStockRawStore();
+    const payload = {
+      shcode: form.value.shcode,
+      name: form.value.name,
+      industry: form.value.industry || '주요업종',
+      type: form.value.type,
+      quantity: form.value.quantity,
+      avgPrice: form.value.avgPrice
+    };
 
     if (isEditMode.value) {
       // 1. Store 액션 호출 (Store state 변경 + DB 수정)
-      await rawStore.updateStock(form.value.shcode, form.value);
+      await rawStore.updateStock(form.value.shcode, payload);
       toast.success(`${form.value.name}(${form.value.shcode}) 종목 정보가 수정되었습니다.`, '종목 정보 수정 완료');
     } else {
       // 1. Store 액션 호출 (Store state 변경 + DB 추가)
-      await rawStore.addStock(form.value);
+      await rawStore.addStock(payload);
       toast.success(`${form.value.name}(${form.value.shcode}) 종목이 DB에 신규 추가되었습니다.`, '종목 추가 완료');
     }
 
@@ -536,7 +544,7 @@ async function submitForm() {
   } catch (err: any) {
     console.error('Submit stock form error:', err);
     errorMsg.value = err.statusMessage || err.message || 'SQLite DB 저장 중 오류가 발생했습니다.';
-    toast.error(errorMsg.value, 'DB 저장 실패');
+    toast.error(errorMsg.value || 'SQLite DB 저장 중 오류가 발생했습니다.', 'DB 저장 실패');
   } finally {
     isSubmitting.value = false;
   }
@@ -563,7 +571,7 @@ async function deleteStockItemDirect(item: StockItemForm) {
   } catch (err: any) {
     console.error('Delete stock error:', err);
     errorMsg.value = err.statusMessage || err.message || '종목 삭제 실패';
-    toast.error(errorMsg.value, '삭제 처리 실패');
+    toast.error(errorMsg.value || '종목 삭제 실패', '삭제 처리 실패');
   } finally {
     isSubmitting.value = false;
   }

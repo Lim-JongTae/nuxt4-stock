@@ -146,8 +146,9 @@ export default defineEventHandler(async (event) => {
     }
 
     // 8대 조건 검사 (typeof === 'number' 엄격 체크)
+    const BOLLINGER_BAND_TOLERANCE_RATE = 1.02;
     const cond_psy = typeof psy === 'number' && psy <= 25.0;
-    const cond_bb = typeof bb_lower === 'number' && bb_lower > 0 && closePrice > 0 && closePrice <= Math.round(bb_lower * 1.02);
+    const cond_bb = typeof bb_lower === 'number' && bb_lower > 0 && closePrice > 0 && closePrice <= Math.round(bb_lower * BOLLINGER_BAND_TOLERANCE_RATE);
     const cond_ma_turn = typeof ma5 === 'number' && typeof ma20 === 'number' && typeof ma60 === 'number' &&
                           ma5 > 0 && ma20 > 0 && ma60 > 0 && ma5 >= ma20 && ma20 >= ma60;
     const cond_volume = typeof volume_ratio === 'number' && volume_ratio >= 120.0;
@@ -155,10 +156,26 @@ export default defineEventHandler(async (event) => {
     const cond_rsi = typeof rsi === 'number' && rsi <= 35.0;
     const cond_divergence = bullish_divergence === true;
 
-    // 공매도 신호 분류
+    // 공매도 신호 분류 및 스코어링 (Option 1: 보조 지표 방식)
     const isEtfOrForeign = s.shcode.startsWith('US') || s.name.includes('액티브') || s.name.includes('KODEX') || s.name.includes('SOL') || s.name.includes('KoAct') || s.name.includes('ETF');
     const shortSignal = classifyShortSellSignal(shortSellHistory, isEtfOrForeign);
     const cond_short_signal = shortSignal.label === "숏커버링(환매수) 유력" || shortSignal.label === "매수세가 공매도 흡수 중";
+
+    let shortSignalScore = 0;
+    if (!shortSellHistory || shortSellHistory.length === 0 || isEtfOrForeign) {
+      // 공매도 데이터 미수집 또는 대상 제외 종목은 중립 보정 5점 부여
+      shortSignalScore = 5;
+    } else if (cond_short_signal) {
+      // 호재 신호: 신뢰도에 따른 스코어 차등 부여 (높음=10점, 중간=7점, 낮음=5점)
+      const shortSignalScoreMap: Record<string, number> = { "높음": 10, "중간": 7, "낮음": 5 };
+      shortSignalScore = shortSignalScoreMap[shortSignal.confidence] ?? 5;
+    } else if (shortSignal.label === "신규 공매도 유입") {
+      // 악재 신호: -5점 감점
+      shortSignalScore = -5;
+    } else {
+      // 보합 / 판단 보류: 0점
+      shortSignalScore = 0;
+    }
 
     let score = 0;
     if (cond_psy) score += 15;
@@ -168,9 +185,10 @@ export default defineEventHandler(async (event) => {
     if (cond_macd) score += 15;
     if (cond_rsi) score += 10;
     if (cond_divergence) score += 5;
-    if (cond_short_signal) score += 10;
+    score += shortSignalScore;
 
-    const isFullyMatched = cond_psy && cond_bb && cond_ma_turn && cond_volume && cond_macd && cond_rsi;
+    // isFullyMatched: 7대 핵심 기술적 지표 충족 시 공매도 데이터 유무와 관계없이 true
+    const isFullyMatched = cond_psy && cond_bb && cond_ma_turn && cond_volume && cond_macd && cond_rsi && cond_divergence;
 
     return {
       shcode: s.shcode,
