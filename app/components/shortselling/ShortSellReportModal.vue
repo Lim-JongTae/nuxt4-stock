@@ -222,6 +222,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import type { ShortSellRecord } from '../../../utils/types/lsSecurities';
 
 const props = defineProps<{
   isOpen: boolean;
@@ -247,7 +248,7 @@ const isEtfOrForeign = computed(() => {
 
 const validShortRecords = computed(() => {
   if (!props.stock?.shortSellHistory || !Array.isArray(props.stock.shortSellHistory)) return [];
-  return props.stock.shortSellHistory.filter(r => 
+  return props.stock.shortSellHistory.filter((r: ShortSellRecord) => 
     (r.shortVolume && r.shortVolume > 0) || 
     (r.shortAvgPrice && r.shortAvgPrice > 0) || 
     (r.balanceRatio && r.balanceRatio > 0)
