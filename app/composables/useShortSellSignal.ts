@@ -39,12 +39,48 @@ export function classifyShortSellSignal(shortSellData: ShortSellRecord[], isEtfO
     };
   }
 
+  // 실제 공매도 잔고/수량 데이터가 유효한 레코드만 추출
+  // (balanceRatio가 undefined/null이 아니면서, 공매도 수량이나 잔고비율 유효성이 존재하는 항목)
+  const validRecords = shortSellData.filter(r => 
+    r && typeof r.balanceRatio === 'number' && !isNaN(r.balanceRatio)
+  );
+
+  // 유효한 공매도 레코드가 2개 미만이거나, 모든 레코드의 잔고비율 및 공매도 수량이 0인 경우 판단 보류
+  const hasNonZeroData = validRecords.some(r => r.balanceRatio > 0 || (r.shortVolume || 0) > 0);
+
+  if (validRecords.length < 2 || !hasNonZeroData) {
+    return {
+      label: "판단 보류",
+      confidence: "낮음",
+      metrics: null,
+      summary: "유효한 LS증권 t1927 공매도 수급 데이터가 부족합니다."
+    };
+  }
+
   // 날짜 오름차순 정렬 (과거 -> 최신) - YYYYMMDD / YYYY-MM-DD 포맷 안전 처리
-  const sortedData = [...shortSellData].sort((a, b) => safeParseTimestamp(a.date) - safeParseTimestamp(b.date));
+  const sortedData = [...validRecords].sort((a, b) => safeParseTimestamp(a.date) - safeParseTimestamp(b.date));
   
-  const start = sortedData[0]!;
-  const latest = sortedData[sortedData.length - 1]!;
+  // 최신 날짜의 데이터가 미수집되어 0으로 떨어진 경우(착시 잔고 감소) 제외 처리
+  let latest = sortedData[sortedData.length - 1]!;
+  let start = sortedData[0]!;
+
+  // 최신 데이터 잔고가 0이고 직전 데이터 잔고가 양수이면(미수집 가능성), 마지막 유효 데이터 사용
+  if (sortedData.length >= 3 && latest.balanceRatio === 0 && sortedData[sortedData.length - 2]!.balanceRatio > 0) {
+    sortedData.pop(); // 0으로 미수집된 당일 데이터 제거
+    latest = sortedData[sortedData.length - 1]!;
+    start = sortedData[0]!;
+  }
+
   const daysCount = sortedData.length;
+
+  if (daysCount < 2) {
+    return {
+      label: "판단 보류",
+      confidence: "낮음",
+      metrics: null,
+      summary: "공매도 추세 비교를 위한 최소 기간(2일 이상) 데이터가 부족합니다."
+    };
+  }
 
   // 1. 기간 누적 잔고비율 변화 (%p) - 소수점 2자리 보정
   const balanceRatioDiff = Number((latest.balanceRatio - start.balanceRatio).toFixed(2));
@@ -64,16 +100,16 @@ export function classifyShortSellSignal(shortSellData: ShortSellRecord[], isEtfO
     : 0;
 
   // 4가지 라벨 추세 분류
-  // - balanceRatioDiff < 0: 공매도 잔고 감소 -> 숏커버링 유력
+  // - balanceRatioDiff < 0: 공매도 잔고 유의미 감소 -> 숏커버링 유력
   // - balanceRatioDiff > 0 && priceDiffRate < 0: 잔고 증가 & 주가 하락 -> 신규 공매도 유입
   // - balanceRatioDiff > 0 && priceDiffRate >= 0: 잔고 증가 & 주가 상승/보합 -> 매수세가 공매도 흡수 중
   // - balanceRatioDiff === 0 (잔고 변동 없음/동률): 판단 보류
   let label: ShortSellSignalResult["label"] = "판단 보류";
-  if (balanceRatioDiff < 0) {
+  if (balanceRatioDiff < -0.01) { // 의미있는 감소일 때만 (소수점 0.01p 초과 감소)
     label = "숏커버링(환매수) 유력";
-  } else if (balanceRatioDiff > 0 && priceDiffRate < 0) {
+  } else if (balanceRatioDiff > 0.01 && priceDiffRate < 0) {
     label = "신규 공매도 유입";
-  } else if (balanceRatioDiff > 0 && priceDiffRate >= 0) {
+  } else if (balanceRatioDiff > 0.01 && priceDiffRate >= 0) {
     label = "매수세가 공매도 흡수 중";
   } else {
     label = "판단 보류";

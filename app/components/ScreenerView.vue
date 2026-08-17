@@ -291,7 +291,7 @@
                     <button 
                       v-else
                       @click="openShortSellReportModal(item)"
-                      class="px-2 py-0.5 rounded text-[10px] font-semibold flex items-center gap-1 cursor-pointer hover:opacity-90 transition-all border shadow-xs"
+                      class="px-2 py-1 rounded-md text-[10px] font-bold flex items-center justify-center gap-1 border transition-all cursor-pointer shadow-xs"
                       :class="{
                         'bg-red-500/20 text-red-400 border-red-500/40 hover:bg-red-500/30': item.shortSellingStatus === '숏커버링(환매수) 유력',
                         'bg-blue-500/20 text-blue-400 border-blue-500/40 hover:bg-blue-500/30': item.shortSellingStatus === '신규 공매도 유입',

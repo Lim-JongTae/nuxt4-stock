@@ -59,6 +59,14 @@ sqlite.exec(`
     content_markdown TEXT NOT NULL,
     created_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS watchlist (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    shcode TEXT NOT NULL UNIQUE,
+    name TEXT NOT NULL,
+    industry TEXT,
+    created_at TEXT NOT NULL
+  );
 `);
 
 // Auto migration check: NOT NULL 제약 해제 및 컬럼 갱신 마이그레이션
@@ -152,6 +160,19 @@ if (holdingsCount.cnt === 0) {
   db.insert(schema.holdings).values([
     { shcode: '0186L0', name: 'KoAct 미국로봇피지컬AI액티브', industry: '인공지능/피지컬AI', quantity: 1046, avgPrice: 11317, currentPrice: 9755, targetPrice: 12200, stopLossPrice: 10800, updatedAt: now },
     { shcode: '0167Z0', name: 'KODEX 미국우주항공', industry: '우주항공/방산', quantity: 435, avgPrice: 9206, currentPrice: 8495, targetPrice: 9900, stopLossPrice: 8790, updatedAt: now }
+  ]).run();
+}
+
+const watchlistCount = sqlite.prepare('SELECT COUNT(*) AS cnt FROM watchlist').get() as { cnt: number };
+if (watchlistCount.cnt === 0) {
+  const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  db.insert(schema.watchlist).values([
+    { shcode: '475070', name: 'KoAct 글로벌친환경전력인프라액티브', industry: '전력인프라', createdAt: now },
+    { shcode: '481180', name: 'SOL 미국AI소프트웨어', industry: 'AI소프트웨어', createdAt: now },
+    { shcode: '035420', name: 'NAVER', industry: '빅테크/디지털', createdAt: now },
+    { shcode: '005930', name: '삼성전자', industry: '전기전자', createdAt: now },
+    { shcode: '000660', name: 'SK하이닉스', industry: 'IT부품/반도체', createdAt: now },
+    { shcode: '068270', name: '셀트리온', industry: '바이오/제약', createdAt: now }
   ]).run();
 }
 

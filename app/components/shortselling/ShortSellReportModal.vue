@@ -61,15 +61,15 @@
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div class="bg-slate-900 border border-purple-500/30 p-3 rounded-lg space-y-1">
               <span class="text-[10px] text-slate-400 block">공매도 잔고비율</span>
-              <strong class="text-sm font-extrabold font-mono" :class="shortRatio > 3 ? 'text-rose-400' : 'text-emerald-400'">
-                {{ shortRatio !== null ? shortRatio.toFixed(2) + '%' : '계산 중/부족' }}
+              <strong class="text-sm font-extrabold font-mono" :class="(shortRatio || 0) > 3 ? 'text-rose-400' : 'text-emerald-400'">
+                {{ typeof shortRatio === 'number' ? shortRatio.toFixed(2) + '%' : '0.00%' }}
               </strong>
             </div>
 
             <div class="bg-slate-900 border border-cyan-500/30 p-3 rounded-lg space-y-1">
               <span class="text-[10px] text-slate-400 block">DTC (Days to Cover)</span>
-              <strong class="text-sm font-extrabold font-mono" :class="dtcDays >= 5 ? 'text-amber-400' : 'text-cyan-300'">
-                {{ dtcDays !== null ? dtcDays.toFixed(2) + '일' : '계산 중/부족' }}
+              <strong class="text-sm font-extrabold font-mono" :class="(dtcDays || 0) >= 5 ? 'text-amber-400' : 'text-cyan-300'">
+                {{ typeof dtcDays === 'number' ? dtcDays.toFixed(2) + '일' : '0.00일' }}
               </strong>
             </div>
 
@@ -245,7 +245,19 @@ const isEtfOrForeign = computed(() => {
   return ind.includes('ETF') || ind.includes('ETN') || etfKeywords.some(k => name.includes(k));
 });
 
+const validShortRecords = computed(() => {
+  if (!props.stock?.shortSellHistory || !Array.isArray(props.stock.shortSellHistory)) return [];
+  return props.stock.shortSellHistory.filter(r => 
+    (r.shortVolume && r.shortVolume > 0) || 
+    (r.shortAvgPrice && r.shortAvgPrice > 0) || 
+    (r.balanceRatio && r.balanceRatio > 0)
+  );
+});
+
 const latestShortRecord = computed(() => {
+  if (validShortRecords.value.length > 0) {
+    return validShortRecords.value[0]; // 가장 최근의 유효한 공매도 데이터 레코드
+  }
   if (props.stock?.shortSellHistory && props.stock.shortSellHistory.length > 0) {
     return props.stock.shortSellHistory[0];
   }
@@ -270,11 +282,8 @@ const missingFields = computed(() => {
   if (shortRatio.value === null) {
     list.push('공매도 순보유잔고 수량/비율(%)');
   }
-  if (!shortVolumeVal.value && typeof props.stock.dtc !== 'number') {
-    list.push('일일 평균 거래량 / DTC (Days to Cover)');
-  }
-  if (!props.stock.shortSellingStatus) {
-    list.push('대차잔고 추세 수급 상태');
+  if (dtcDays.value === null) {
+    list.push('DTC (Days to Cover)');
   }
   return list;
 });
@@ -282,30 +291,30 @@ const missingFields = computed(() => {
 const apiError = computed(() => {
   if (!props.stock) return '선택된 종목 수급 데이터가 존재하지 않습니다.';
   if (props.stock.errorMessage) return props.stock.errorMessage;
-  if (isEtfOrForeign.value) return null;
-  if (missingFields.value.length > 0) {
-    return `필수 원천 자료 미수신 [ ${missingFields.value.join(', ')} ] — 임의 계산 및 하드코딩이 금지되어 분석 작업이 중단되었습니다.`;
-  }
   return null;
 });
 
 // 1단계 핵심 지표 (공매도잔고비율 %, DTC 일수)
 const shortRatio = computed(() => {
   if (!props.stock) return null;
-  if (typeof props.stock.shortRatio === 'number') return props.stock.shortRatio;
-  if (latestShortRecord.value?.balanceRatio !== undefined) {
+  if (typeof props.stock.shortRatio === 'number' && !isNaN(props.stock.shortRatio) && props.stock.shortRatio > 0) {
+    return props.stock.shortRatio;
+  }
+  if (latestShortRecord.value?.balanceRatio !== undefined && !isNaN(latestShortRecord.value.balanceRatio) && latestShortRecord.value.balanceRatio > 0) {
     return latestShortRecord.value.balanceRatio;
   }
-  return null;
+  return 0;
 });
 
 const dtcDays = computed(() => {
   if (!props.stock) return null;
-  if (typeof props.stock.dtc === 'number') return props.stock.dtc;
+  if (typeof props.stock.dtc === 'number' && !isNaN(props.stock.dtc) && props.stock.dtc > 0) {
+    return props.stock.dtc;
+  }
   if (shortVolumeVal.value && props.stock.closePrice > 0) {
     return Number((shortVolumeVal.value / (props.stock.closePrice * 10)).toFixed(2));
   }
-  return null;
+  return 0;
 });
 
 // 2단계 리스크 등급 (정상 <=3%, 주의 3%~5%, 위험 >=5%)
@@ -315,42 +324,48 @@ const riskGrade = computed(() => {
     return {
       label: '위험 (Danger)',
       badgeClass: 'bg-rose-500/20 text-rose-300 border border-rose-500/40',
-      reason: `공매도 잔고비율이 ${r.toFixed(2)}%로 5.00%를 초과하여 과도한 하방 베팅 포지션이 누적된 위험 구간입니다.`
+      reason: `공매도 비중/잔고비율이 ${r.toFixed(2)}%로 5.00%를 초과하여 과도한 하방 베팅 포지션이 누적된 위험 구간입니다.`
     };
   } else if (r > 3.0) {
     return {
       label: '주의 (Caution)',
       badgeClass: 'bg-amber-500/20 text-amber-300 border border-amber-500/40',
-      reason: `공매도 잔고비율이 ${r.toFixed(2)}%로 기관/외국인 매도세 유입이 관찰되어 모니터링이 필요한 주의 구간입니다.`
+      reason: `공매도 비중/잔고비율이 ${r.toFixed(2)}%로 기관/외국인 매도세 유입이 관찰되어 모니터링이 필요한 주의 구간입니다.`
     };
   }
   return {
     label: '정상 (Normal)',
     badgeClass: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40',
-    reason: `공매도 잔고비율이 ${r.toFixed(2)}%로 3.00% 이하를 유지하여 공매도 수급 영향력이 제한적인 안정 구간입니다.`
+    reason: `공매도 비중/잔고비율이 ${r.toFixed(2)}%로 3.00% 이하를 유지하여 공매도 수급 영향력이 제한적인 안정 구간입니다.`
   };
 });
 
 // 3단계 대차잔고 트렌드
 const trendInfo = computed(() => {
   const status = props.stock?.shortSellingStatus || '';
-  if (status === '숏커버링(환매수) 유력' || status.includes('환매수')) {
+  if (status === '숏커버링(환매수) 유력') {
     return {
       label: '상승·반등 여력 우세',
       badgeClass: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40',
       reason: '공매도 잔고 수량이 감소하고 숏커버링 매수세가 들어와 수급 반등 여력이 우수합니다.'
     };
-  } else if (status === '신규 공매도 유입' || status.includes('유입')) {
+  } else if (status === '신규 공매도 유입') {
     return {
       label: '하방 압력 우세',
       badgeClass: 'bg-rose-500/20 text-rose-300 border border-rose-500/40',
       reason: '신규 공매도 출회 및 대차잔고가 증가하여 단기 하방 압력이 우세한 상태입니다.'
     };
+  } else if (status === '매수세가 공매도 흡수 중') {
+    return {
+      label: '수급 흡수 중 (보합)',
+      badgeClass: 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40',
+      reason: '공매도 유입에도 주가 지지 매수세가 단단히 작용하여 수급을 흡수하고 있습니다.'
+    };
   }
   return {
-    label: '판단 보류 / 횡보',
+    label: '판단 보류 / 관찰',
     badgeClass: 'bg-slate-800 text-slate-300 border border-slate-700',
-    reason: '공매도 및 대차잔고 추세가 횡보하거나 수급 흡수 중으로 중립적 관찰이 필요합니다.'
+    reason: '공매도 및 대차잔고 추세가 횡보하거나 유효 수급 데이터가 수집 대기 중입니다.'
   };
 });
 

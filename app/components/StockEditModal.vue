@@ -223,7 +223,7 @@
             class="px-4 py-2 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg flex items-center gap-1.5 cursor-pointer active:scale-95"
           >
             <i class="fas fa-plus-circle"></i>
-            <span>신규 종목 DB 추가하기</span>
+            <span>신규 종목 추가하기</span>
           </button>
         </div>
 
@@ -337,7 +337,7 @@
                 class="px-5 py-2 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold shadow-lg flex items-center gap-1.5 disabled:opacity-50 cursor-pointer active:scale-95"
               >
                 <i class="fas" :class="isSubmitting ? 'fa-spinner fa-spin' : 'fa-check'"></i>
-                <span>{{ isSubmitting ? '저장 중...' : (isEditMode ? 'SQLite DB 수정 저장' : 'SQLite DB 신규 추가') }}</span>
+                <span>{{ isSubmitting ? '저장 중...' : (isEditMode ? 'DB 수정 저장' : '신규 추가') }}</span>
               </button>
             </div>
           </div>

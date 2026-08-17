@@ -98,6 +98,10 @@ export const useScreenerStore = defineStore('screener', {
   },
 
   actions: {
+    async initFromStorage(forceRefresh = false) {
+      await this.loadInitial(forceRefresh);
+    },
+
     async loadInitial(forceRefresh = false) {
       const rawStore = useLSStockRawStore();
 

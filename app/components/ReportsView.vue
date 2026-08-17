@@ -116,10 +116,10 @@ function loadLiveReport() {
   screenerStore.refreshScreener();
 }
 
-onMounted(() => {
-  screenerStore.initFromStorage();
+onMounted(async () => {
+  await screenerStore.initFromStorage();
   if (!screenerStore.newData || screenerStore.newData.length === 0) {
-    screenerStore.refreshScreener();
+    await screenerStore.refreshScreener();
   }
 });
 </script>
