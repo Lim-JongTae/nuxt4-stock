@@ -45,11 +45,11 @@ export async function fetchLSShortSellDetailMap(
             ? `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`
             : rawDate;
           
-          const balanceRatioRaw = parseLSNumberOrUndefined(r.ms_m_rate) ?? parseLSNumberOrUndefined(r.gm_per) ?? parseLSNumberOrUndefined(r.ms_rate);
+          const balanceRatioRaw = parseLSNumberOrUndefined(r.gm_per) ?? 0;
           const balanceRatio = balanceRatioRaw !== undefined ? balanceRatioRaw : 0;
 
           const shortAvgPrice = parseLSNumberOrUndefined(r.gm_avg) ?? parseLSNumberOrUndefined(r.price) ?? 0;
-          const shortVolume = parseLSNumber(r.gm_vo) || parseLSNumber(r.gm_vo_sum) || 0;
+          const shortVolume = parseLSNumber(r.gm_vo_sum) || 0;  // 누적 공매도 수량 = 잔고수량
           const changeRate = parseFloat(String(r.diff || 0));
 
           if (formattedDate) {
@@ -61,7 +61,6 @@ export async function fetchLSShortSellDetailMap(
   } catch (e: any) {
     console.error(`🔴 [LS증권 t1927 공매도 수신 실패 - ${shcode}]:`, e.message || String(e));
   }
-  return detailMap;
   return detailMap;
 }
 
@@ -87,9 +86,16 @@ export async function fetchLSShortSellTrend(
   if (!rawCode) return null;
 
   try {
-    const livePrice = externalLivePrice !== undefined ? externalLivePrice : await fetchLSPrice(token, shcode);
+    // 병렬 처리: fetchLSPrice와 fetchLSShortSellDetailMap은 독립적
+    const [livePrice, shortDetailMap] = await Promise.all([
+      externalLivePrice !== undefined
+        ? Promise.resolve(externalLivePrice)
+        : fetchLSPrice(token, shcode),
+      fetchLSShortSellDetailMap(token, shcode)
+    ]);
+
+    // htsPriceMap은 livePrice에 의존하므로 순차 실행
     const htsPriceMap = await fetchLST1305Prices(token, shcode, livePrice);
-    const shortDetailMap = await fetchLSShortSellDetailMap(token, shcode);
 
     const todayStr = formatDateYYYYMMDD(new Date());
     const formattedToday = `${todayStr.slice(0, 4)}-${todayStr.slice(4, 6)}-${todayStr.slice(6, 8)}`;
@@ -106,7 +112,8 @@ export async function fetchLSShortSellTrend(
 
         let price = hts?.close || 0;
         let volume = hts?.volume || 0;
-        const changeRate = hts?.diff !== undefined ? hts.diff : (shortDetail?.changeRate || 0);
+        // hts.diff는 존재하지 않으므로 shortDetail.changeRate만 사용
+        const changeRate = shortDetail?.changeRate || 0;
 
         if (date === formattedToday && livePrice && livePrice > 0) {
           price = livePrice;

@@ -123,8 +123,8 @@
       </div>
     </div>
 
-    <!-- Dedicated LS Securities Top 3 Promising Sectors (상위 3대 유망업종) Banner -->
-    <div v-if="screenerStore.topSectors && screenerStore.topSectors.length > 0" class="bg-linear-to-r from-slate-900 via-purple-950/50 to-slate-900 border border-purple-500/40 rounded-2xl p-4 shadow-xl space-y-3">
+    <!-- Dedicated LS Securities Top 5 Promising Sectors (상위 5대 유망업종) Banner -->
+    <div v-if="rawStore.topSectors && rawStore.topSectors.length > 0" class="bg-linear-to-r from-slate-900 via-purple-950/50 to-slate-900 border border-purple-500/40 rounded-2xl p-4 shadow-xl space-y-3">
       <div class="flex items-center justify-between border-b border-purple-500/20 pb-2">
         <div class="flex items-center gap-2.5">
           <div class="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-400 flex items-center justify-center font-bold text-sm shrink-0 shadow-inner">
@@ -132,7 +132,7 @@
           </div>
           <div>
             <h4 class="text-xs font-extrabold text-white flex items-center gap-2">
-              <span>LS증권 선정 실시간 상위 3대 유망업종</span>
+              <span>LS증권 선정 실시간 상위 5대 유망업종</span>
               <span class="text-[10px] text-purple-300 font-mono bg-purple-950/80 px-2 py-0.5 rounded border border-purple-700/60">t8424 / t1531</span>
             </h4>
             <p class="text-[11px] text-slate-400">LS증권 업종별 등락률 수급 데이터를 실시간 분석하여 선정된 최상위 유망 섹터입니다.</p>
@@ -141,9 +141,9 @@
       </div>
 
       <!-- Promising Sector Cards Grid -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div 
-          v-for="(sec, idx) in screenerStore.topSectors.slice(0, 3)" 
+      <div class="grid grid-cols-1 sm:grid-cols-5 gap-3">
+        <div
+          v-for="(sec, idx) in rawStore.topSectors.slice(0, 5)"
           :key="sec.code"
           class="bg-slate-950/80 border border-purple-500/30 hover:border-purple-500/70 p-3 rounded-xl flex items-center justify-between transition-all shadow-md group"
         >
@@ -175,14 +175,14 @@
               <span>LS증권 KOSPI200 선물 시장 베이시스</span>
               <span class="text-[10px] text-indigo-400 font-mono font-normal bg-indigo-950 px-2 py-0.5 rounded border border-indigo-800">t2111 / t2424</span>
             </h4>
-            <template v-if="screenerStore.marketBasis">
-              <span 
+            <template v-if="rawStore.marketBasis">
+              <span
                 class="px-2.5 py-0.5 rounded-md text-[11px] font-extrabold flex items-center gap-1 border shadow-xs"
-                :class="screenerStore.marketBasis.basis >= 0 ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' : 'bg-rose-500/20 text-rose-400 border-rose-500/40'"
+                :class="rawStore.marketBasis.basis >= 0 ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' : 'bg-rose-500/20 text-rose-400 border-rose-500/40'"
               >
-                <i class="fas" :class="screenerStore.marketBasis.basis >= 0 ? 'fa-arrow-up text-emerald-400' : 'fa-arrow-down text-rose-400'"></i>
-                <span>{{ screenerStore.marketBasis.basis >= 0 ? '+' : '' }}{{ screenerStore.marketBasis.basis }}pt</span>
-                <span class="text-[10px] font-bold opacity-90">({{ screenerStore.marketBasis.basisStatus }})</span>
+                <i class="fas" :class="rawStore.marketBasis.basis >= 0 ? 'fa-arrow-up text-emerald-400' : 'fa-arrow-down text-rose-400'"></i>
+                <span>{{ rawStore.marketBasis.basis >= 0 ? '+' : '' }}{{ rawStore.marketBasis.basis }}pt</span>
+                <span class="text-[10px] font-bold opacity-90">({{ rawStore.marketBasis.basisStatus }})</span>
               </span>
             </template>
           </div>
@@ -192,28 +192,28 @@
         </div>
       </div>
 
-      <div v-if="screenerStore.marketBasis" class="flex flex-wrap items-center gap-3 text-xs">
+      <div v-if="rawStore.marketBasis" class="flex flex-wrap items-center gap-3 text-xs">
         <div class="bg-slate-950/90 border border-slate-800 px-3 py-1.5 rounded-xl font-mono shadow-inner">
           <span class="text-slate-400 text-[10px] block font-semibold">선물 현재가</span>
-          <strong class="text-white text-xs">{{ screenerStore.marketBasis.futuresPrice }}pt</strong>
+          <strong class="text-white text-xs">{{ rawStore.marketBasis.futuresPrice }}pt</strong>
         </div>
         <div class="bg-slate-950/90 border border-slate-800 px-3 py-1.5 rounded-xl font-mono shadow-inner">
           <span class="text-slate-400 text-[10px] block font-semibold">현물 지수</span>
-          <strong class="text-white text-xs">{{ screenerStore.marketBasis.kospi200Index }}pt</strong>
+          <strong class="text-white text-xs">{{ rawStore.marketBasis.kospi200Index }}pt</strong>
         </div>
         <div class="bg-slate-950/90 border border-slate-800 px-3 py-1.5 rounded-xl font-mono shadow-inner">
           <span class="text-slate-400 text-[10px] block font-semibold">미결제약정 (OI)</span>
-          <strong class="text-cyan-400 text-xs">{{ Number(screenerStore.marketBasis.oi).toLocaleString() }}계약</strong>
+          <strong class="text-cyan-400 text-xs">{{ Number(rawStore.marketBasis.oi).toLocaleString() }}계약</strong>
         </div>
         <div class="bg-slate-950/90 border border-slate-800 px-3 py-1.5 rounded-xl font-mono shadow-inner">
           <span class="text-slate-400 text-[10px] block font-semibold">프로그램 순매수</span>
-          <strong :class="screenerStore.marketBasis.programNetBuy >= 0 ? 'text-rose-400' : 'text-cyan-400'" class="text-xs">
-            {{ screenerStore.marketBasis.programNetBuy >= 0 ? '+' : '' }}{{ Number(screenerStore.marketBasis.programNetBuy).toLocaleString() }}억원
+          <strong :class="rawStore.marketBasis.programNetBuy >= 0 ? 'text-rose-400' : 'text-cyan-400'" class="text-xs">
+            {{ rawStore.marketBasis.programNetBuy >= 0 ? '+' : '' }}{{ Number(rawStore.marketBasis.programNetBuy).toLocaleString() }}억원
           </strong>
         </div>
         <div class="bg-slate-950/90 border border-slate-800 px-3 py-1.5 rounded-xl font-mono shadow-inner">
           <span class="text-slate-400 text-[10px] block font-semibold">VKOSPI 변동성</span>
-          <strong class="text-amber-400 text-xs">{{ screenerStore.marketBasis.vkospi }}</strong>
+          <strong class="text-amber-400 text-xs">{{ rawStore.marketBasis.vkospi }}</strong>
         </div>
       </div>
     </div>

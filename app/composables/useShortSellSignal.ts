@@ -77,7 +77,7 @@ export function classifyShortSellSignal(shortSellData: ShortSellRecord[], isEtfO
   if (sortedData.length >= 3 && latest.balanceRatio === 0 && sortedData[sortedData.length - 2]!.balanceRatio > 0) {
     sortedData.pop(); // 0으로 미수집된 당일 데이터 제거
     latest = sortedData[sortedData.length - 1]!;
-    start = sortedData[0]!;
+    // start는 sortedData[0]로 이미 설정되어 있으므로 재할당 불필요
   }
 
   const daysCount = sortedData.length;

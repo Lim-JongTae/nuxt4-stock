@@ -126,8 +126,14 @@ export const useScreenerStore = defineStore('screener', {
     recalculateFromRaw() {
       const rawStore = useLSStockRawStore();
 
+      console.log('🔄 [useScreenerStore] recalculateFromRaw 호출:', {
+        rawStockListCount: rawStore.rawStockList?.length || 0,
+        sample: JSON.parse(JSON.stringify(rawStore.rawStockList?.[0] || {}))
+      });
+
       if (!rawStore.rawStockList || rawStore.rawStockList.length === 0) {
         this.newData = [];
+        console.warn('⚠️ rawStockList가 비어있음');
         return;
       }
 
@@ -168,6 +174,11 @@ export const useScreenerStore = defineStore('screener', {
           isFullyMatched: quantResult.isFullyMatched,
           conditions: quantResult.conditions
         };
+      });
+
+      console.log('✅ [useScreenerStore] newData 업데이트:', {
+        count: calculatedItems.length,
+        sample: JSON.parse(JSON.stringify(calculatedItems[0] || {}))
       });
 
       this.newData = calculatedItems;

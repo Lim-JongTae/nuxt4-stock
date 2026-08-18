@@ -44,14 +44,14 @@ export interface LST1927ShortSellItem {
   date: string;
   price: string | number;
   sign?: string;
-  diff?: string | number;
-  volume?: string | number;
-  gm_vo?: string | number;
-  gm_vo_sum?: string | number;
-  gm_per?: string | number;
+  diff?: string | number;           // 등락율 (%)
+  volume?: string | number;         // 일일 총 거래량
+  gm_vo?: string | number;          // 당일 공매도 거래량 (일일)
+  gm_vo_sum?: string | number;      // 누적 공매도 잔고수량 (DTC 계산용)
+  gm_per?: string | number;         // 공매도 잔고비율 (%)
   ms_m_rate?: string | number;
   ms_rate?: string | number;
-  gm_avg?: string | number;
+  gm_avg?: string | number;         // 공매도 평균체결가
 }
 
 // 5. 파싱된 일별 캔들 데이터 구조
@@ -90,12 +90,12 @@ export interface TechnicalIndicators {
 // 7. 파싱된 공매도 시계열 레코드
 export interface ShortSellRecord {
   date: string;                     // YYYY-MM-DD
-  balanceRatio: number;             // 잔고비율 (%)
-  price: number;                    // 주가 종가 (원)
-  shortAvgPrice?: number;           // 공매도 평균체결가 (원)
-  shortVolume?: number;             // 공매도 체결/매도 수량 (주)
-  changeRate?: number;              // 주가 등락율 (%)
-  volume: number;                   // 총 누적 거래량
+  balanceRatio: number;             // 잔고비율 (%) - t1927.gm_per
+  price: number;                    // 주가 종가 (원) - t1927.price
+  shortAvgPrice?: number;           // 공매도 평균체결가 (원) - t1927.gm_avg
+  shortVolume?: number;             // 공매도 누적 잔고수량 (주) - t1927.gm_vo_sum (DTC 계산용)
+  changeRate?: number;              // 주가 등락율 (%) - t1927.diff
+  volume: number;                   // 일일 총 거래량 (주) - t1927.volume (평균 거래량 계산용)
 }
 
 // 8. 공매도/숏커버링 수급 분석 최종 결과
@@ -208,6 +208,7 @@ export interface StockItem {
   holdingQuantity?: number;
   holdingAvgPrice?: number;
   closePrice: number;
+  volume?: number | null;  // 당일 거래량 (DTC 계산용)
   psy?: number | null;
   bbLower?: number | null;
   ma5?: number | null;
@@ -222,6 +223,7 @@ export interface StockItem {
   shortSellingSummary?: string;
   shortAvgPrice?: number | null;
   shortVolume?: number | null;
+  shortRatio?: number | null;  // 공매도 잔고비율 (%)
   shortSellMetrics?: {
     balanceRatioDiff: number;
     priceDiffRate: number;
@@ -298,6 +300,21 @@ export interface StockDetailStateItem {
   macdHist?: number | null;
   volumeRatio?: number | null;
   bbLower?: number | null;
+  ma5?: number | null;
+  ma20?: number | null;
+  ma60?: number | null;
+  bullishDivergence?: boolean;
+  indicators?: {
+    psy?: number | null;
+    bbLower?: number | null;
+    ma5?: number | null;
+    ma20?: number | null;
+    ma60?: number | null;
+    volumeRatio?: number | null;
+    macdHist?: number | null;
+    rsi?: number | null;
+    bullishDivergence?: boolean;
+  };
   generatedReport?: string;
   generatedReportAt?: string;
   updatedAt?: string;

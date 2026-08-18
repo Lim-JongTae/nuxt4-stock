@@ -315,13 +315,24 @@ const dtcDays = computed(() => {
     return props.stock.dtc;
   }
 
-  // 2. DTC = 공매도 잔고수량 / 일평균 거래량
-  // 일평균 거래량이 없으므로 최근 거래량으로 근사 계산
+  // 2. DTC = 공매도 잔고수량 (gm_vo_sum) / 일평균 거래량
+  // 일평균 거래량 = 최근 20일 평균 거래량 (shortSellHistory에서 계산)
+  if (shortVolumeVal.value && validShortRecords.value.length > 0) {
+    const recentRecords = validShortRecords.value.slice(0, Math.min(20, validShortRecords.value.length));
+    const totalVolume = recentRecords.reduce((sum, r) => sum + (r.volume || 0), 0);
+    const avgDailyVolume = totalVolume / recentRecords.length;
+
+    if (avgDailyVolume > 0) {
+      return Number((shortVolumeVal.value / avgDailyVolume).toFixed(2));
+    }
+  }
+
+  // 3. 대체: 당일 거래량으로 근사 계산 (평균 거래량 데이터 없을 경우)
   if (shortVolumeVal.value && props.stock.volume && props.stock.volume > 0) {
     return Number((shortVolumeVal.value / props.stock.volume).toFixed(2));
   }
 
-  // 3. 계산 불가 시 null 반환 (하드코딩 금지)
+  // 4. 계산 불가 시 null 반환 (하드코딩 금지)
   return null;
 });
 

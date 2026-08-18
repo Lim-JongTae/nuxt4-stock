@@ -92,9 +92,8 @@ export async function fetchLSSectorData(token: string): Promise<{
         const sanitizeSectorName = (name: string): string | null => {
           if (!name) return null;
           const clean = name.replace(/\s+/g, '');
-          if (['종합', '코스피', '코스닥', '대형', '중형', '소형', '제조', 'KOSPI', 'KOSDAQ', '지수', '시장'].some(kw => clean.includes(kw))) {
-            return null;
-          }
+
+          // 이름 정규화만 수행 (하드코딩 필터 제거)
           if (clean === '전기전자') return '전기/전자';
           if (clean === '철강금속') return '철강/금속';
           if (clean === '종이목재') return '종이/목재';

@@ -48,7 +48,7 @@ export function calculateQuantIndicators(raw: RawStockApiData): CalculatedStockD
 
   // 8대 지표 조건 검사 & 퀀트 스코어 비즈니스 계산
   const cond_psy = typeof psy === 'number' && psy <= 25.0;
-  const cond_bb = typeof closePrice === 'number' && closePrice > 0 && typeof bbLower === 'number' && bbLower > 0 && closePrice <= Math.round(bbLower * BOLLINGER_BAND_TOLERANCE_RATE);
+  const cond_bb = typeof closePrice === 'number' && closePrice > 0 && typeof bbLower === 'number' && bbLower > 0 && closePrice <= (bbLower * BOLLINGER_BAND_TOLERANCE_RATE);
   const cond_ma_turn = typeof ma5 === 'number' && typeof ma20 === 'number' && typeof ma60 === 'number' &&
                         ma5 > 0 && ma20 > 0 && ma60 > 0 && ma5 >= ma20 && ma20 >= ma60;
   const cond_volume = typeof volumeRatio === 'number' && volumeRatio >= 120.0;

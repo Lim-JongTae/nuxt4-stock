@@ -79,12 +79,12 @@ export async function fetchLST1305Prices(
         t8410InBlock: {
           shcode: rawCode,
           gubun: '2',      // 2: 일봉
-          qrycnt: 100,    // 요청건수 100건
-          sdate: sdate,   // 시작일자 YYYYMMDD
-          edate: edate,   // 종료일자 YYYYMMDD
+          qrycnt: 100,
+          sdate: sdate,
+          edate: edate,
           cts_date: '',
           comp_yn: 'N',
-          sujung: 'Y'     // 수정주가 적용
+          sujung: 'Y'
         }
       }),
       signal: AbortSignal.timeout(5000)
@@ -92,12 +92,11 @@ export async function fetchLST1305Prices(
 
     if (res.ok) {
       const data = await res.json();
-      // t8410OutBlock1 일봉 캔들 배열 파싱
       const rows = data.t8410OutBlock1 || data.t8410OutBlock;
       if (Array.isArray(rows) && rows.length > 0) {
         rows.forEach((r: any) => {
           const rawDate = String(r.date || '').trim();
-          const formattedDate = rawDate.length === 8 
+          const formattedDate = rawDate.length === 8
             ? `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`
             : rawDate;
           const closePrice = parseLSNumber(r.close);
@@ -117,9 +116,11 @@ export async function fetchLST1305Prices(
           }
         });
       }
+    } else {
+      console.error(`🔴 [LS증권 t8410 응답 오류 - ${shcode}]: HTTP ${res.status}`);
     }
   } catch (e: any) {
-    console.error(`🔴 [LS증권 t8410 API전용 차트 수신 실패 - ${shcode}]:`, e.message || String(e));
+    console.error(`🔴 [LS증권 t8410 차트 수신 실패 - ${shcode}]:`, e.message || String(e));
   }
 
   // 오늘 날짜 데이터는 externalLivePrice 실시간가가 전달되면 덮어씀

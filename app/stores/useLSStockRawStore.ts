@@ -167,20 +167,29 @@ export const useLSStockRawStore = defineStore('lsStockRaw', {
 
       inFlightFetchPromise = (async () => {
         try {
-          const response = await $fetch<ScreenerApiResponse>(`/api/screener?ts=${Date.now()}`, {
+          const response = await $fetch<ScreenerApiResponse>('/api/screener', {
             method: 'POST',
-            headers: { 'Cache-Control': 'no-cache' }
+            headers: { 'Cache-Control': 'no-cache' },
+            query: { ts: Date.now() }
           });
 
           if (response && response.success) {
+            console.log('📊 [useLSStockRawStore] API 응답 성공:', {
+              newDataCount: response.newData?.length || 0,
+              topSectorsCount: response.topSectors?.length || 0,
+              sample: JSON.parse(JSON.stringify(response.newData?.[0] || {}))
+            });
+
             if (response.newData && response.newData.length > 0) {
               this.rawStockList = [...response.newData];
+              console.log('✅ rawStockList 업데이트:', this.rawStockList.length, '종목');
             }
             if (response.marketBasis) {
               this.marketBasis = response.marketBasis;
             }
             if (response.topSectors) {
               this.topSectors = response.topSectors;
+              console.log('✅ topSectors 업데이트:', this.topSectors.length, '개');
             }
             if (response.bottomSectors) {
               this.bottomSectors = response.bottomSectors;

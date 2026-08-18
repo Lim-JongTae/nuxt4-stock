@@ -86,17 +86,23 @@ export default defineEventHandler(async (event) => {
 
   const candidateStocks = Array.from(new Set(stockMap.values()));
 
+  console.log(`📋 [screener/index.post.ts] candidateStocks 목록:`, {
+    totalCount: candidateStocks.length,
+    stocks: candidateStocks.map(s => `${s.shcode}:${s.name}`).join(', ')
+  });
+
   // 2. LS증권 Open API (t1102 실시간가, t1305 65일봉, t1927 공매도일별추이) 연동
   let apiCallNote = '';
   let priceFailCount = 0;
   const stockLiveMap = new Map<string, { price?: number; indicators?: any; shortSellHistory?: ShortSellRecord[] }>();
 
   if (token) {
-    const BATCH_SIZE = 1;
-    const BATCH_DELAY_MS = 650;
+    const BATCH_SIZE = 1;  // LS증권 API 제한: 1초당 1개 TR만 허용
+    const BATCH_DELAY_MS = 1000;  // 배치 간 1초 대기 (API 제한 준수)
 
     for (let i = 0; i < candidateStocks.length; i += BATCH_SIZE) {
       const batch = candidateStocks.slice(i, i + BATCH_SIZE);
+      console.log(`🔄 [배치 ${Math.floor(i/BATCH_SIZE) + 1}] 처리 종목:`, batch.map(s => s.shcode).join(', '));
       const results = await Promise.allSettled(batch.map(async (stock) => {
         const isEtf = stock.shcode.startsWith('US') || stock.name.includes('액티브') || stock.name.includes('KODEX') || stock.name.includes('SOL') || stock.name.includes('KoAct') || stock.name.includes('ETF') || stock.name.includes('TIGER') || stock.name.includes('ACE');
 
@@ -109,13 +115,25 @@ export default defineEventHandler(async (event) => {
           shortSellPromise
         ]);
 
+        console.log(`📈 [${stock.shcode}] fetchLST1305Prices 결과:`, {
+          htsPriceMapSize: htsPriceMap?.size || 0,
+          hasData: htsPriceMap && htsPriceMap.size > 0
+        });
+
         const indicators = calculateTechnicalIndicators(htsPriceMap);
+
+        console.log(`🔍 [${stock.shcode} ${stock.name}] 지표 계산 결과:`, {
+          htsPriceMapSize: htsPriceMap?.size || 0,
+          indicators: JSON.parse(JSON.stringify(indicators || {}))
+        });
 
         const candleList = htsPriceMap && htsPriceMap.size > 0 ? Array.from(htsPriceMap.values()) : [];
         const latestCandleClose = candleList.length > 0 ? candleList[candleList.length - 1]?.close : undefined;
+        const latestCandleVolume = candleList.length > 0 ? candleList[candleList.length - 1]?.volume : undefined;
 
         stockLiveMap.set(stock.shcode, {
           price: latestCandleClose,
+          volume: latestCandleVolume,
           indicators,
           shortSellHistory: shortSellTrend || undefined
         });
@@ -173,6 +191,12 @@ export default defineEventHandler(async (event) => {
       shortSellHistory = shortSellHistory.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }
 
+    // 최신 공매도 데이터 추출
+    const latestShortRecord = shortSellHistory && shortSellHistory.length > 0 ? shortSellHistory[0] : null;
+    const shortVolume = latestShortRecord?.balanceVolume ?? null;
+    const shortAvgPrice = latestShortRecord?.price ?? null;
+    const shortRatio = latestShortRecord?.balanceRatio ?? null;
+
     // 8대 조건 검사 (typeof === 'number' 엄격 체크)
     const BOLLINGER_BAND_TOLERANCE_RATE = 1.02;
     const cond_psy = typeof psy === 'number' && psy <= 25.0;
@@ -218,6 +242,7 @@ export default defineEventHandler(async (event) => {
       avgPrice: s.avgPrice,
       quantity: s.quantity,
       closePrice,
+      volume: liveData.volume ?? null,
       psy,
       bbLower: bb_lower,
       ma5,
@@ -227,6 +252,9 @@ export default defineEventHandler(async (event) => {
       macdHist: macd_hist,
       rsi,
       bullishDivergence: bullish_divergence,
+      shortVolume,
+      shortAvgPrice,
+      shortRatio,
       indicators: {
         psy,
         bbLower: bb_lower,
@@ -279,6 +307,13 @@ export default defineEventHandler(async (event) => {
 
   const topSectors = (sectorData?.topSectors || []).filter(s => s.name && !isMacroOrScale(s.name));
   const bottomSectors = (sectorData?.bottomSectors || []).filter(s => s.name && !isMacroOrScale(s.name));
+
+    console.log('📊 [screener/index.post.ts] 응답 데이터:', {
+      newDataCount: newBatch.length,
+      topSectorsCount: topSectors.length,
+      sampleStock: newBatch[0],
+      sampleSector: topSectors[0]
+    });
 
     return {
       success: true,
