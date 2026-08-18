@@ -24,7 +24,7 @@
         </span>
 
         <button 
-          @click="portfolioStore.refreshPrices()" 
+          @click="handleRefresh" 
           :disabled="portfolioStore.isLoading"
           class="px-4 py-2.5 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-500/20 flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
         >
@@ -191,15 +191,29 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { usePortfolioStore, type HoldingItem } from '~/stores/usePortfolioStore';
+import { usePortfolioStore } from '~/stores/usePortfolioStore';
+import { useScreenerStore } from '~/stores/useScreenerStore';
+import { useGlobalToast } from '~/composables/useGlobalToast';
 
 const portfolioStore = usePortfolioStore();
+const screenerStore = useScreenerStore();
+const toast = useGlobalToast();
 const aiReportTimestamp = ref('');
 const isCopied = ref(false);
 
 onMounted(async () => {
-  await portfolioStore.fetchHoldings(false);
+  await screenerStore.loadInitial(false);
+  await portfolioStore.fetchHoldings(true);
 });
+
+async function handleRefresh() {
+  try {
+    await portfolioStore.fetchHoldings(true);
+    toast.success('보유 종목의 LS증권 실시간 시세가 성공적으로 갱신되었습니다.', '포트폴리오 시세 갱신 완료');
+  } catch (err: any) {
+    toast.error(err.message || '시세 갱신 실패', '시세 갱신 오류');
+  }
+}
 
 function getPnl(item: HoldingItem) {
   const pnlAmount = (item.currentPrice - item.avgPrice) * item.quantity;

@@ -102,12 +102,12 @@
               <span>시세 갱신: {{ screenerStore.lastUpdated || '실시간' }}</span>
             </span>
             <button 
-              @click="screenerStore.refreshScreener()" 
-              :disabled="screenerStore.isRefreshing"
+              @click="handleDashboardRefresh" 
+              :disabled="screenerStore.isRefreshing || rawStore.isLoading"
               class="px-2.5 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
             >
-              <i class="fas" :class="screenerStore.isRefreshing ? 'fa-spinner fa-spin text-amber-400' : 'fa-sync-alt'"></i>
-              <span>{{ screenerStore.isRefreshing ? '갱신 중...' : '시세 갱신' }}</span>
+              <i class="fas" :class="(screenerStore.isRefreshing || rawStore.isLoading) ? 'fa-spinner fa-spin text-amber-400' : 'fa-sync-alt'"></i>
+              <span>{{ (screenerStore.isRefreshing || rawStore.isLoading) ? '갱신 중...' : '시세 갱신' }}</span>
             </button>
           </div>
         </div>
@@ -272,7 +272,7 @@
             <div class="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
               <div class="flex items-center justify-between bg-slate-900/60 px-2 py-1 rounded border border-slate-800">
                 <span class="text-slate-400 text-[10px]">전일종가:</span>
-                <strong class="text-slate-200">{{ Number(item.closePrice || item.close || 0).toLocaleString() }}원</strong>
+                <strong class="text-slate-200">{{ Number(item.closePrice || 0).toLocaleString() }}원</strong>
               </div>
               <div class="flex items-center justify-between bg-slate-900/60 px-2 py-1 rounded border border-slate-800">
                 <span class="text-slate-400 text-[10px]">현재가:</span>
@@ -305,16 +305,30 @@
 import { ref, onMounted } from 'vue';
 import { usePortfolioStore } from '~/stores/usePortfolioStore';
 import { useScreenerStore } from '~/stores/useScreenerStore';
+import { useLSStockRawStore } from '~/stores/useLSStockRawStore';
 import { useMarketStrategy } from '~/composables/useMarketStrategy';
+import { useGlobalToast } from '~/composables/useGlobalToast';
 import StockEditModal, { type StockItemForm } from '~/components/StockEditModal.vue';
 
 const portfolioStore = usePortfolioStore();
 const screenerStore = useScreenerStore();
+const rawStore = useLSStockRawStore();
+const toast = useGlobalToast();
 const { ruleBasedPerspective, buyStrategy, targetPriceStrategy, stopLossStrategy } = useMarketStrategy();
 
 const isModalOpen = ref(false);
 const selectedStockForEdit = ref<StockItemForm | null>(null);
 const aiError = ref<string | null>(null);
+
+async function handleDashboardRefresh() {
+  try {
+    await screenerStore.refreshScreener(true);
+    await portfolioStore.fetchHoldings(true);
+    toast.success('LS증권 실시간 시세 및 8대 지표 갱신이 완료되었습니다.', '실시간 시세 갱신 완료');
+  } catch (err: any) {
+    toast.error(err.message || '시세 갱신에 실패했습니다.', '시세 갱신 오류');
+  }
+}
 
 function openAddModal() {
   selectedStockForEdit.value = null;
@@ -336,8 +350,8 @@ async function triggerAiDiagnosis() {
 }
 
 onMounted(async () => {
-  await portfolioStore.fetchHoldings(false);
   await screenerStore.loadInitial(false);
+  await portfolioStore.fetchHoldings(true);
 });
 
 function formatKrw(val: number) {

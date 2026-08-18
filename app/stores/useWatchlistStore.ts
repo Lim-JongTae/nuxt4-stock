@@ -95,10 +95,6 @@ export const useWatchlistStore = defineStore('watchlist', {
         this.isInitialized = true;
       }
 
-      if (!forceRefresh && this.items.length > 0) {
-        return;
-      }
-
       await this.refresh();
     },
 
@@ -109,11 +105,28 @@ export const useWatchlistStore = defineStore('watchlist', {
         await rawStore.fetchRawStockData(true);
 
         if (rawStore.rawStockList && rawStore.rawStockList.length > 0) {
-          // ✅ 성능 최적화: Map으로 O(1) 조회
+          // ✅ rawStore.rawStockList에 실제 수집된 종목 코드 집합 생성
+          const rawCodeSet = new Set<string>();
+          rawStore.rawStockList.forEach(sc => {
+            if (!sc.shcode) return;
+            const clean = sanitizeShcode(sc.shcode);
+            rawCodeSet.add(sc.shcode);
+            rawCodeSet.add(clean);
+            rawCodeSet.add(`A${clean}`);
+          });
+
+          // ✅ 1. rawStore에서 삭제된 종목을 this.items에서 제거
+          this.items = this.items.filter(it => {
+            if (!it.shcode) return false;
+            const clean = sanitizeShcode(it.shcode);
+            return rawCodeSet.has(it.shcode) || rawCodeSet.has(clean) || rawCodeSet.has(`A${clean}`);
+          });
+
+          // ✅ 2. rawStore 항목을 기반으로 items 갱신 및 신규 반영
           const itemsMap = arrayToMap(this.items);
 
           rawStore.rawStockList.forEach(sc => {
-            // ✅ 유틸 함수 사용: ETF 판별
+            const cleanCode = sanitizeShcode(sc.shcode);
             const isEtf = isEtfOrEtn(sc.name, sc.industry);
 
             const quantResult = calculateQuantIndicators({
@@ -138,7 +151,7 @@ export const useWatchlistStore = defineStore('watchlist', {
               : quantResult.shortSignal.label;
             const score = quantResult.score;
 
-            const existing = itemsMap.get(sc.shcode);
+            const existing = itemsMap.get(cleanCode) || itemsMap.get(sc.shcode);
             if (existing) {
               existing.currentPrice = sc.closePrice || existing.currentPrice;
               existing.psy = sc.psy ?? existing.psy;
@@ -151,6 +164,7 @@ export const useWatchlistStore = defineStore('watchlist', {
                 shcode: sc.shcode,
                 name: sc.name,
                 industry: sc.industry || '주요업종',
+                type: (sc.isHolding || sc.type === 'holding') ? 'holding' : 'watchlist',
                 currentPrice: sc.closePrice || 0,
                 psy: sc.psy,
                 volumeRatio: sc.volumeRatio,
@@ -160,6 +174,12 @@ export const useWatchlistStore = defineStore('watchlist', {
               });
             }
           });
+
+          // ✅ Vue 3 반응성(Reactivity) 갱신 트리거 보장
+          this.items = [...this.items];
+          this.saveToStorage();
+        } else {
+          this.items = [];
           this.saveToStorage();
         }
       } catch (err: any) {

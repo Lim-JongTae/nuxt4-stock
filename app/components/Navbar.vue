@@ -89,14 +89,16 @@
 import { computed } from 'vue';
 import { useScreenerStore } from '~/stores/useScreenerStore';
 import { useWatchlistStore } from '~/stores/useWatchlistStore';
+import { usePortfolioStore } from '~/stores/usePortfolioStore';
 
 const screenerStore = useScreenerStore();
 const watchlistStore = useWatchlistStore();
+const portfolioStore = usePortfolioStore();
 
 const lsApiStatus = computed(() => {
-  if (screenerStore.isRefreshing || watchlistStore.isLoading) {
+  if (screenerStore.isRefreshing || watchlistStore.isLoading || portfolioStore.isLoading) {
     return {
-      text: '연동 확인 중...',
+      text: '실시간 갱신 중...',
       badgeClass: 'text-amber-400 font-extrabold',
       dotClass: 'bg-amber-400 animate-pulse',
       borderClass: 'border-amber-500/30 bg-amber-950/30',
@@ -104,32 +106,22 @@ const lsApiStatus = computed(() => {
     };
   }
 
-  if (screenerStore.errorMessage || watchlistStore.errorMessage) {
+  if (screenerStore.errorMessage || watchlistStore.errorMessage || portfolioStore.errorMessage) {
     return {
       text: '연동 오류',
       badgeClass: 'text-rose-400 font-extrabold',
       dotClass: 'bg-rose-500',
       borderClass: 'border-rose-500/40 bg-rose-950/40',
-      tooltip: screenerStore.errorMessage || watchlistStore.errorMessage || 'LS증권 API 데이터 수신 오류'
-    };
-  }
-
-  if (screenerStore.newData.length > 0 || watchlistStore.items.length > 0) {
-    return {
-      text: '정상 연동',
-      badgeClass: 'text-emerald-400 font-extrabold',
-      dotClass: 'bg-emerald-400 animate-pulse',
-      borderClass: 'border-slate-800 bg-slate-900',
-      tooltip: 'LS증권 Open API 실시간 데이터 파싱 정상 수신 중'
+      tooltip: screenerStore.errorMessage || watchlistStore.errorMessage || portfolioStore.errorMessage || 'LS증권 API 데이터 수신 오류'
     };
   }
 
   return {
-    text: '연동 대기 중',
-    badgeClass: 'text-slate-400 font-semibold',
-    dotClass: 'bg-slate-500',
+    text: '정상 연동 (실시간)',
+    badgeClass: 'text-emerald-400 font-extrabold',
+    dotClass: 'bg-emerald-400 animate-pulse',
     borderClass: 'border-slate-800 bg-slate-900',
-    tooltip: '데이터 수신 대기 중'
+    tooltip: 'LS증권 Open API 실시간 데이터 파싱 정상 수신 중'
   };
 });
 </script>

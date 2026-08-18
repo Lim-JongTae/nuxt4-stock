@@ -103,14 +103,19 @@ export const useScreenerStore = defineStore('screener', {
     },
 
     async loadInitial(forceRefresh = false) {
-      const rawStore = useLSStockRawStore();
+      this.isRefreshing = true;
+      try {
+        const rawStore = useLSStockRawStore();
 
-      if (!rawStore.hasRawData || forceRefresh) {
-        await rawStore.fetchRawStockData(forceRefresh);
-      }
+        if (!rawStore.hasRawData || forceRefresh) {
+          await rawStore.fetchRawStockData(forceRefresh);
+        }
 
-      if (rawStore.hasRawData) {
-        this.recalculateFromRaw();
+        if (rawStore.hasRawData) {
+          this.recalculateFromRaw();
+        }
+      } finally {
+        this.isRefreshing = false;
       }
     },
 

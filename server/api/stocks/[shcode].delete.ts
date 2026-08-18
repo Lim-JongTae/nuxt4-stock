@@ -16,16 +16,16 @@ export default defineEventHandler(async (event) => {
 
   try {
     // 1. stocks, watchlist, holdings 3개 테이블 전체에서 조회 및 이름 파악
-    const existingStocks = await db.select().from(stocks).where(or(eq(stocks.shcode, cleanCode), eq(stocks.shcode, codeWithPrefix)));
-    const existingHoldings = await db.select().from(holdings).where(or(eq(holdings.shcode, cleanCode), eq(holdings.shcode, codeWithPrefix)));
-    const existingWatch = await db.select().from(watchlist).where(or(eq(watchlist.shcode, cleanCode), eq(watchlist.shcode, codeWithPrefix)));
+    const existingStocks = await db.select().from(stocks).where(or(eq(stocks.shcode, cleanCode), eq(stocks.shcode, codeWithPrefix), eq(stocks.shcode, rawCode)));
+    const existingHoldings = await db.select().from(holdings).where(or(eq(holdings.shcode, cleanCode), eq(holdings.shcode, codeWithPrefix), eq(holdings.shcode, rawCode)));
+    const existingWatch = await db.select().from(watchlist).where(or(eq(watchlist.shcode, cleanCode), eq(watchlist.shcode, codeWithPrefix), eq(watchlist.shcode, rawCode)));
 
     const stockName = existingStocks[0]?.name || existingHoldings[0]?.name || existingWatch[0]?.name || cleanCode;
 
     // 2. 3개 테이블 (stocks, watchlist, holdings) 모두에서 완벽 삭제
-    await db.delete(stocks).where(or(eq(stocks.shcode, cleanCode), eq(stocks.shcode, codeWithPrefix)));
-    await db.delete(watchlist).where(or(eq(watchlist.shcode, cleanCode), eq(watchlist.shcode, codeWithPrefix)));
-    await db.delete(holdings).where(or(eq(holdings.shcode, cleanCode), eq(holdings.shcode, codeWithPrefix)));
+    await db.delete(stocks).where(or(eq(stocks.shcode, cleanCode), eq(stocks.shcode, codeWithPrefix), eq(stocks.shcode, rawCode)));
+    await db.delete(watchlist).where(or(eq(watchlist.shcode, cleanCode), eq(watchlist.shcode, codeWithPrefix), eq(watchlist.shcode, rawCode)));
+    await db.delete(holdings).where(or(eq(holdings.shcode, cleanCode), eq(holdings.shcode, codeWithPrefix), eq(holdings.shcode, rawCode)));
 
     // 3. 매매 변동 로그 기록
     await db.insert(portfolioLogs).values({

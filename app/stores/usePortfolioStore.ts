@@ -70,8 +70,30 @@ export const usePortfolioStore = defineStore('portfolio', {
   },
 
   actions: {
+    syncLivePrices() {
+      const rawStore = useLSStockRawStore();
+      const screenerStore = useScreenerStore();
+      const screenerMap = arrayToMap(screenerStore.newData);
+
+      this.holdings.forEach(h => {
+        const cleanCode = sanitizeShcode(h.shcode);
+        const rawStock = rawStore.rawStockMap.get(cleanCode);
+        const screenerStock = screenerMap.get(cleanCode);
+        const livePrice = getLivePrice(h, rawStock, screenerStock);
+
+        if (livePrice > 0) {
+          h.currentPrice = livePrice;
+        }
+      });
+      // ✅ Vue 3 반응성(Reactivity) 갱신 트리거 보장
+      this.holdings = [...this.holdings];
+    },
+
     async fetchHoldings(forceRefresh = false) {
-      if (!forceRefresh && this.holdings.length > 0) return;
+      if (!forceRefresh && this.holdings.length > 0) {
+        this.syncLivePrices();
+        return;
+      }
 
       this.isLoading = true;
       this.errorMessage = null;
@@ -87,37 +109,45 @@ export const usePortfolioStore = defineStore('portfolio', {
         const data = await $fetch<HoldingItem[]>(`/api/holdings?ts=${Date.now()}`);
 
         if (data && Array.isArray(data) && data.length > 0) {
-          // ✅ 성능 최적화: Map으로 O(1) 조회
           const screenerMap = arrayToMap(screenerStore.newData);
 
           this.holdings = data.map(h => {
-            const rawStock = rawStore.rawStockMap.get(h.shcode);
-            const screenerStock = screenerMap.get(h.shcode);
+            const cleanCode = sanitizeShcode(h.shcode);
+            const rawStock = rawStore.rawStockMap.get(cleanCode);
+            const screenerStock = screenerMap.get(cleanCode);
 
-            // ✅ 유틸 함수 사용
             const livePrice = getLivePrice(h, rawStock, screenerStock);
 
             return {
               ...h,
+              shcode: cleanCode,
               quantity: Number(h.quantity) || 0,
               avgPrice: Number(h.avgPrice) || 0,
-              currentPrice: Number(livePrice) > 0 ? Number(livePrice) : (Number(h.avgPrice) || 0)
+              currentPrice: Number(livePrice) > 0 ? Number(livePrice) : (Number(h.currentPrice) || Number(h.avgPrice) || 0)
             };
           });
         } else if (rawStore.holdingsList && rawStore.holdingsList.length > 0) {
-          this.holdings = rawStore.holdingsList.map(h => ({
-            shcode: h.shcode,
-            name: h.name,
-            industry: h.industry || '주요보유',
-            quantity: h.holdingQuantity ?? h.quantity ?? 0,
-            avgPrice: h.holdingAvgPrice ?? h.avgPrice ?? 0,
-            currentPrice: h.closePrice || h.holdingAvgPrice || h.avgPrice || 0,
-            targetPrice: h.targetPrice || 0,
-            stopLossPrice: h.stopLossPrice || 0,
-            trailingRate: 2.5,
-            updatedAt: rawStore.lastUpdated || new Date().toLocaleString('ko-KR')
-          }));
+          this.holdings = rawStore.holdingsList.map(h => {
+            const cleanCode = sanitizeShcode(h.shcode);
+            const rawStock = rawStore.rawStockMap.get(cleanCode);
+            const livePrice = getLivePrice(h, rawStock, null);
+
+            return {
+              shcode: cleanCode,
+              name: h.name,
+              industry: h.industry || '주요보유',
+              quantity: h.holdingQuantity ?? h.quantity ?? 0,
+              avgPrice: h.holdingAvgPrice ?? h.avgPrice ?? 0,
+              currentPrice: Number(livePrice) > 0 ? Number(livePrice) : (h.closePrice || h.holdingAvgPrice || h.avgPrice || 0),
+              targetPrice: h.targetPrice || 0,
+              stopLossPrice: h.stopLossPrice || 0,
+              trailingRate: 2.5,
+              updatedAt: rawStore.lastUpdated || new Date().toLocaleString('ko-KR')
+            };
+          });
         }
+
+        this.syncLivePrices();
       } catch (err: any) {
         console.error('Fetch holdings error:', err);
         this.errorMessage = err.statusMessage || err.message || '보유 종목 데이터를 불러오는 데 실패했습니다.';
@@ -131,13 +161,16 @@ export const usePortfolioStore = defineStore('portfolio', {
       this.errorMessage = null;
 
       try {
-        const data = await $fetch<any>('/api/holdings/price');
+        const rawStore = useLSStockRawStore();
+        await rawStore.fetchRawStockData(true);
+
+        const data = await $fetch<any>(`/api/holdings/price?ts=${Date.now()}`);
         if (data && Array.isArray(data)) {
-          // ✅ 성능 최적화: Map으로 O(n²) → O(n)
           const holdingsMap = arrayToIndexMap(this.holdings);
 
           data.forEach((p: any) => {
-            const idx = holdingsMap.get(p.shcode);
+            const cleanCode = sanitizeShcode(p.shcode);
+            const idx = holdingsMap.get(cleanCode) ?? holdingsMap.get(p.shcode);
             if (idx !== undefined && this.holdings[idx]) {
               const h = this.holdings[idx];
               h.currentPrice = Number(p.currentPrice) || h.currentPrice || h.avgPrice;
@@ -148,6 +181,8 @@ export const usePortfolioStore = defineStore('portfolio', {
             }
           });
         }
+
+        this.syncLivePrices();
       } catch (err: any) {
         console.error('Refresh prices error:', err);
         this.errorMessage = err.statusMessage || err.message || '실시간 시세 갱신에 실패했습니다.';

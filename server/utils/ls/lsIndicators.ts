@@ -99,18 +99,34 @@ export function calculateTechnicalIndicators(
     } else {
       rsi = 50;
     }
+  } else if (n >= 5) {
+    let gains = 0;
+    let losses = 0;
+    for (let i = 1; i < n; i++) {
+      const diff = closes[i] - closes[i - 1];
+      if (diff > 0) gains += diff;
+      else losses += Math.abs(diff);
+    }
+    const avgGain = gains / (n - 1);
+    const avgLoss = losses / (n - 1);
+    if (avgGain + avgLoss > 0) {
+      rsi = Number(((avgGain / (avgGain + avgLoss)) * 100).toFixed(1));
+    } else {
+      rsi = 50;
+    }
   }
 
-  // 6. MACD 오실레이터 표준 계산 (SMA 시드 기반 12/26일 EMA MACD선 - 9일 EMA 시그널선)
+  // 6. MACD 오실레이터 표준 계산 (최소 26일 이상 캔들 확보 시 계산)
   let macdHist: number | null = null;
-  if (n >= 35) {
-    const k12 = 2 / (12 + 1);
-    const k26 = 2 / (26 + 1);
+  if (n >= 26) {
+    const period12 = Math.min(12, Math.floor(n / 2));
+    const period26 = Math.min(26, n - 1);
+    const k12 = 2 / (period12 + 1);
+    const k26 = 2 / (period26 + 1);
     const k9 = 2 / (9 + 1);
 
-    // 1) EMA12 및 EMA26 계산 (초기 12일/26일 SMA 시드 설정으로 초기 편향 완벽 제거)
-    const sma12 = closes.slice(0, 12).reduce((a, b) => a + b, 0) / 12;
-    const sma26 = closes.slice(0, 26).reduce((a, b) => a + b, 0) / 26;
+    const sma12 = closes.slice(0, period12).reduce((a, b) => a + b, 0) / period12;
+    const sma26 = closes.slice(0, period26).reduce((a, b) => a + b, 0) / period26;
 
     const ema12Series: number[] = new Array(n).fill(0);
     const ema26Series: number[] = new Array(n).fill(0);
@@ -120,28 +136,27 @@ export function calculateTechnicalIndicators(
 
     for (let i = 0; i < n; i++) {
       const price = closes[i] ?? 0;
-      if (i >= 12) {
+      if (i >= period12) {
         currEma12 = price * k12 + currEma12 * (1 - k12);
       }
-      if (i >= 26) {
+      if (i >= period26) {
         currEma26 = price * k26 + currEma26 * (1 - k26);
       }
       ema12Series[i] = currEma12;
       ema26Series[i] = currEma26;
     }
 
-    // 2) MACD Line 시계열 생성 (인덱스 25부터 시작)
     const macdSeries: number[] = [];
-    for (let i = 25; i < n; i++) {
+    for (let i = period26; i < n; i++) {
       macdSeries.push((ema12Series[i] ?? 0) - (ema26Series[i] ?? 0));
     }
 
-    // 3) Signal Line (9일 EMA) 계산 (MACD Line의 첫 9일 SMA 시드)
-    if (macdSeries.length >= 9) {
-      const signalSma9 = macdSeries.slice(0, 9).reduce((a, b) => a + b, 0) / 9;
-      let currSignal = signalSma9;
+    if (macdSeries.length >= 1) {
+      const signalLen = Math.min(9, macdSeries.length);
+      const signalSma = macdSeries.slice(0, signalLen).reduce((a, b) => a + b, 0) / signalLen;
+      let currSignal = signalSma;
 
-      for (let i = 9; i < macdSeries.length; i++) {
+      for (let i = signalLen; i < macdSeries.length; i++) {
         const m = macdSeries[i] ?? 0;
         currSignal = m * k9 + currSignal * (1 - k9);
       }

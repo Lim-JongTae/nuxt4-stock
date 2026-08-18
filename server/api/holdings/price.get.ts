@@ -5,7 +5,7 @@ import { fetchLSPrice } from '../../utils/ls/lsQuotes';
 
 export default defineEventHandler(async () => {
   const env = loadEnv();
-  const token = await getLSToken(env.LS_APP_KEY || '', env.LS_SECREAT || '');
+  const { token, error: tokenError } = await getLSToken(env.LS_APP_KEY || '', env.LS_SECREAT || '');
 
   const items = await db.select().from(holdings).all();
   const localTime = new Date().toLocaleString('ko-KR');

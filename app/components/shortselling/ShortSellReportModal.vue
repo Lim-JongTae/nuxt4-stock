@@ -61,14 +61,14 @@
           <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div class="bg-slate-900 border border-purple-500/30 p-3 rounded-lg space-y-1">
               <span class="text-[10px] text-slate-400 block">공매도 잔고비율</span>
-              <strong class="text-sm font-extrabold font-mono" :class="(shortRatio || 0) > 3 ? 'text-rose-400' : 'text-emerald-400'">
+              <strong class="text-sm font-extrabold font-mono" :class="(shortRatio || 0) > 3 ? 'text-rose-400' : 'text-blue-400'">
                 {{ typeof shortRatio === 'number' ? shortRatio.toFixed(2) + '%' : '0.00%' }}
               </strong>
             </div>
 
             <div class="bg-slate-900 border border-cyan-500/30 p-3 rounded-lg space-y-1">
               <span class="text-[10px] text-slate-400 block">DTC (Days to Cover)</span>
-              <strong class="text-sm font-extrabold font-mono" :class="(dtcDays || 0) >= 5 ? 'text-amber-400' : 'text-cyan-300'">
+              <strong class="text-sm font-extrabold font-mono" :class="(dtcDays || 0) >= 5 ? 'text-rose-400' : 'text-cyan-300'">
                 {{ typeof dtcDays === 'number' ? dtcDays.toFixed(2) + '일' : '0.00일' }}
               </strong>
             </div>
@@ -160,8 +160,8 @@
           </span>
 
           <ul class="space-y-2 text-[11px]">
-            <li v-if="dtcDays !== null && dtcDays >= 5.0" class="flex items-start gap-2 text-amber-300 bg-amber-950/20 p-2 rounded border border-amber-500/30">
-              <i class="fas fa-fire text-amber-400 mt-0.5"></i>
+            <li v-if="dtcDays !== null && dtcDays >= 5.0" class="flex items-start gap-2 text-rose-300 bg-rose-950/20 p-2 rounded border border-rose-500/30">
+              <i class="fas fa-fire text-rose-400 mt-0.5"></i>
               <span><strong>DTC {{ dtcDays.toFixed(1) }}일 (고지표):</strong> 거래량 대비 공매도 잔고가 많아 탈출구가 좁으므로, 반등 호재 발생 시 숏스퀴즈 폭발 강도가 강력해질 수 있습니다.</span>
             </li>
             <li class="flex items-start gap-2 text-slate-300 bg-slate-900/60 p-2 rounded border border-slate-800/60">
@@ -198,7 +198,7 @@
                   <td class="px-2.5 py-1.5 text-slate-400">{{ row.date }}</td>
                   <td class="px-2.5 py-1.5 font-bold text-white">{{ Number(row.price).toLocaleString() }}원</td>
                   <td class="px-2.5 py-1.5 text-amber-300">{{ Number(row.volume || 0).toLocaleString() }}주</td>
-                  <td class="px-2.5 py-1.5" :class="row.balanceRatio > 3 ? 'text-rose-400 font-bold' : 'text-emerald-400'">{{ (row.balanceRatio || 0).toFixed(2) }}%</td>
+                  <td class="px-2.5 py-1.5" :class="row.balanceRatio > 3 ? 'text-rose-400 font-bold' : 'text-blue-400'">{{ (row.balanceRatio || 0).toFixed(2) }}%</td>
                   <td class="px-2.5 py-1.5 text-slate-300">{{ row.shortAvgPrice ? Number(row.shortAvgPrice).toLocaleString() + '원' : '-' }}</td>
                 </tr>
               </tbody>
@@ -223,6 +223,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import type { ShortSellRecord } from '../../../utils/types/lsSecurities';
+import { isEtfOrEtn } from '../../../utils/stockUtils';
 
 const props = defineProps<{
   isOpen: boolean;
@@ -242,8 +243,7 @@ const isEtfOrForeign = computed(() => {
   if (!props.stock) return false;
   const name = props.stock.name || '';
   const ind = props.stock.industry || '';
-  const etfKeywords = ['KODEX', 'TIGER', 'ACE', 'SOL', 'RISE', 'KoAct', 'PLUS', 'HANARO', 'WOORI', 'UNICORN', 'TIMEFOLIO', 'HERO', 'KBSTAR', 'ARIRANG', 'ETF', 'ETN'];
-  return ind.includes('ETF') || ind.includes('ETN') || etfKeywords.some(k => name.includes(k));
+  return isEtfOrEtn(name, ind);
 });
 
 const validShortRecords = computed(() => {
@@ -309,13 +309,20 @@ const shortRatio = computed(() => {
 
 const dtcDays = computed(() => {
   if (!props.stock) return null;
+
+  // 1. stock.dtc가 있으면 우선 사용
   if (typeof props.stock.dtc === 'number' && !isNaN(props.stock.dtc) && props.stock.dtc > 0) {
     return props.stock.dtc;
   }
-  if (shortVolumeVal.value && props.stock.closePrice > 0) {
-    return Number((shortVolumeVal.value / (props.stock.closePrice * 10)).toFixed(2));
+
+  // 2. DTC = 공매도 잔고수량 / 일평균 거래량
+  // 일평균 거래량이 없으므로 최근 거래량으로 근사 계산
+  if (shortVolumeVal.value && props.stock.volume && props.stock.volume > 0) {
+    return Number((shortVolumeVal.value / props.stock.volume).toFixed(2));
   }
-  return 0;
+
+  // 3. 계산 불가 시 null 반환 (하드코딩 금지)
+  return null;
 });
 
 // 2단계 리스크 등급 (정상 <=3%, 주의 3%~5%, 위험 >=5%)

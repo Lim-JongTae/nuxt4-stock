@@ -1,5 +1,6 @@
 import { db } from '../../db';
 import { holdings } from '../../db/schema';
+import { eq } from 'drizzle-orm';
 import fs from 'fs';
 import path from 'path';
 import { loadEnv, getLSToken } from '../../utils/ls/lsAuth';
@@ -14,7 +15,7 @@ function parseNumber(val: any): number {
 
 export default defineEventHandler(async () => {
   const env = loadEnv();
-  const tokenRes = await getLSToken(env.LS_APP_KEY || '', env.LS_SECREAT || '');
+  const tokenRes = await getLSToken(env.LS_APP_KEY || '', env.LS_SECRET || '');
   const token = tokenRes.token;
 
   // 1. Initial Sync from report JSON if DB empty
@@ -66,62 +67,95 @@ export default defineEventHandler(async () => {
     console.warn('⚠️ [보유종목 DB 동기화 실패]:', err.message || String(err));
   }
 
-  // 2. Real-time Price Update via LS Securities Open API (표준 TR: t1305 통합시세 KRX+NXT)
+  // 2. Real-time Price Update & Candle Data via LS Securities Open API (Promise.allSettled 병렬 처리)
   const items = await db.select().from(holdings).all();
   const localTime = new Date().toLocaleString('ko-KR');
 
-  for (const item of items) {
-    if (token) {
-      try {
-        const candleMap = await fetchLST1305Prices(token, item.shcode);
-        const latestCandle = candleMap && candleMap.size > 0 ? Array.from(candleMap.values()).pop() : null;
-        const livePrice = latestCandle?.close || (await fetchLSPrice(token, item.shcode));
+  // 병렬로 시세 + 캔들 데이터 수집
+  const candleDataMap = new Map<string, any[]>();
+  const indicatorsMap = new Map<string, any>();
 
-        if (livePrice && livePrice > 0) {
-          item.currentPrice = livePrice;
-          item.updatedAt = localTime;
+  if (token && items.length > 0) {
+    await Promise.allSettled(
+      items.map(async (item) => {
+        try {
+          // 실시간 시세 조회
+          const t1102Price = await fetchLSPrice(token, item.shcode);
+          const livePrice = t1102Price || null;
+
+          if (livePrice && livePrice > 0) {
+            item.currentPrice = livePrice;
+            item.updatedAt = localTime;
+
+            try {
+              await db.update(holdings)
+                .set({ currentPrice: livePrice, updatedAt: localTime })
+                .where(eq(holdings.shcode, item.shcode))
+                .run();
+            } catch {}
+          }
+
+          // LS증권 t1305 캔들 데이터 조회 (40일치)
+          const candleMap = await fetchLST1305Prices(token, item.shcode);
+          if (candleMap && candleMap.size > 0) {
+            const candleArray = Array.from(candleMap.entries())
+              .sort((a, b) => a[0].localeCompare(b[0]))
+              .map(([date, c]) => ({
+                date,
+                open: c.open,
+                high: c.high,
+                low: c.low,
+                close: c.close,
+                volume: c.volume
+              }));
+            candleDataMap.set(item.shcode, candleArray);
+
+            // 기술적 지표 계산
+            const { calculateTechnicalIndicators } = await import('../../utils/ls/lsIndicators');
+            const indicators = calculateTechnicalIndicators(candleMap);
+            indicatorsMap.set(item.shcode, indicators);
+          }
+        } catch (e: any) {
+          console.warn(`⚠️ [LS증권 보유종목 데이터 수신 실패 - ${item.shcode}]:`, e.message || String(e));
         }
-      } catch (e: any) {
-        console.warn(`⚠️ [LS증권 t1305/t1102 보유종목 현재가 수신 실패 - ${item.shcode}]:`, e.message || String(e));
-      }
-    }
+      })
+    );
   }
 
-  // 3. Generate 40-day Candle Data & Calculate Dynamic Tech Target/StopLoss Prices
+  // 3. Calculate Dynamic Target/StopLoss Prices from Real Technical Indicators
   const resultWithCandles = items.map(item => {
+    const candles = candleDataMap.get(item.shcode) || [];
+    const indicators = indicatorsMap.get(item.shcode);
     const curPrice = item.currentPrice || item.avgPrice || 0;
-    const candles = [];
-    const baseDate = new Date();
 
-    for (let i = 40; i >= 0; i--) {
-      const d = new Date(baseDate);
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().slice(0, 10);
+    // 볼린저 밴드 기반 목표가/손절가 계산 (실제 LS증권 데이터 기반)
+    let dynamicTargetPrice = item.targetPrice ?? 0;
+    let dynamicStopLossPrice = item.stopLossPrice ?? 0;
 
-      const noise = Math.sin(i * 0.5) * (curPrice * 0.015) + (Math.cos(i * 0.3) * (curPrice * 0.01));
-      const close = Math.round(curPrice + noise);
-      const open = Math.round(close * (1 + (Math.random() * 0.01 - 0.005)));
-      const high = Math.max(open, close) + Math.round(curPrice * 0.005);
-      const low = Math.min(open, close) - Math.round(curPrice * 0.005);
-      const volume = Math.round(10000 + Math.random() * 50000);
+    if (indicators) {
+      // bbUpper 계산 (ma20 + 2 * stdDev)
+      const bbUpper = indicators.ma20 && indicators.bbLower
+        ? Math.round(indicators.ma20 + (indicators.ma20 - indicators.bbLower))
+        : null;
 
-      candles.push({ date: dateStr, open, high, low, close, volume });
+      // DB에 저장된 값이 없으면 실제 지표값 사용
+      if (dynamicTargetPrice === 0 && bbUpper && bbUpper > 0) {
+        dynamicTargetPrice = bbUpper;
+      } else if (dynamicTargetPrice === 0) {
+        dynamicTargetPrice = Math.round(curPrice * 1.1); // 최후 폴백
+      }
+
+      if (dynamicStopLossPrice === 0 && indicators.bbLower && indicators.bbLower > 0) {
+        dynamicStopLossPrice = indicators.bbLower;
+      } else if (dynamicStopLossPrice === 0) {
+        dynamicStopLossPrice = Math.round(item.avgPrice * 0.95); // 최후 폴백
+      }
+    } else {
+      // 지표 계산 실패 시 최후 폴백
+      if (dynamicTargetPrice === 0) dynamicTargetPrice = Math.round(curPrice * 1.1);
+      if (dynamicStopLossPrice === 0) dynamicStopLossPrice = Math.round(item.avgPrice * 0.95);
     }
 
-    // Dynamic tech price calculations (Bollinger upper/lower & ATR)
-    const closes = candles.map(c => c.close);
-    const period = 20;
-    const slice = closes.slice(-period);
-    const mean = slice.reduce((a, b) => a + b, 0) / period;
-    const variance = slice.reduce((a, b) => a + (b - mean) ** 2, 0) / period;
-    const std = Math.sqrt(variance);
-    const bbUpper = Math.round(mean + 2 * std);
-    const bbLower = Math.round(mean - 2 * std);
-
-    const itemTargetPrice = item.targetPrice ?? 0;
-    const itemStopLossPrice = item.stopLossPrice ?? 0;
-    const dynamicTargetPrice = itemTargetPrice > 0 ? itemTargetPrice : (bbUpper > 0 ? bbUpper : curPrice);
-    const dynamicStopLossPrice = itemStopLossPrice > 0 ? itemStopLossPrice : (bbLower > 0 ? bbLower : curPrice);
     const dynamicTrailingRate = 2.5;
 
     return {

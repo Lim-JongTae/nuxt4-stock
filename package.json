@@ -39,7 +39,6 @@
     "nuxt": "^4.5.2",
     "pinia": "^4.0.2",
     "tailwindcss": "^4.1.18",
-    "typescript": "^6.0.3",
     "vue": "^3.5.41",
     "vue-router": "^5.2.0"
   },
@@ -47,6 +46,7 @@
     "@types/better-sqlite3": "^9.6.0",
     "@vitest/ui": "^4.1.10",
     "drizzle-kit": "^0.18.1",
+    "typescript": "^5.9.3",
     "vitest": "^4.1.10"
   }
 }

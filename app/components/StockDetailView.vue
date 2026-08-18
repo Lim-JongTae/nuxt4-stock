@@ -392,22 +392,20 @@ async function persistReportToServer(reportText: string) {
 onMounted(async () => {
   stockDetailStore.initFromStorage();
   
-  // 1. LocalStorage 캐시 데이터 및 저장된 AI 보고서가 있으면 새로고침 없이 0ms 즉시 화면 표기
+  // 1. LocalStorage 캐시 데이터 및 저장된 AI 보고서가 있으면 0ms 즉시 화면 우선 표기
   const cached = stockDetailStore.getStockCache(props.shcode);
   if (cached) {
     stockData.value = cached;
     if (cached.generatedReport) {
       savedReportText.value = cached.generatedReport;
     }
-    isLoading.value = false;
-    return; // 캐시가 있으면 매번 재수집하지 않음
   }
 
-  // 2. 캐시가 완전히 비어있는 최초 1회에만 수집
-  await loadStockDetail();
+  // 2. LS증권 Open API를 호출하여 최신 실시간 종가 및 수급 데이터를 갱신
+  await loadStockDetail(true);
 });
 
-async function loadStockDetail() {
+async function loadStockDetail(forceRefresh = true) {
   if (!props.shcode) return;
   if (!stockData.value) {
     isLoading.value = true;
@@ -415,24 +413,26 @@ async function loadStockDetail() {
   errorMessage.value = null;
 
   try {
-    const updated = await stockDetailStore.fetchAndCacheStock(props.shcode);
+    const updated = await stockDetailStore.fetchAndCacheStock(props.shcode, forceRefresh);
     if (updated) {
       stockData.value = updated;
 
-      // AI 퀀트 판단 수행 및 업데이트
-      const result = await analyzeStockWithClaude(updated as any);
-      if (result) {
-        aiAnalysis.value = result;
-        const freshReport = generateBuyFormatReport(updated, result);
-        savedReportText.value = freshReport;
-        
-        // Pinia Store 및 LocalStorage에 1달 보존 저장
-        stockDetailStore.saveAiReport(props.shcode, freshReport);
+      // AI 퀀트 판단 수행 (AI 분석 결과가 비어있는 경우 수행)
+      if (!aiAnalysis.value) {
+        const result = await analyzeStockWithClaude(updated as any);
+        if (result) {
+          aiAnalysis.value = result;
+          const freshReport = generateBuyFormatReport(updated, result);
+          savedReportText.value = freshReport;
+          
+          // Pinia Store 및 LocalStorage에 1달 보존 저장
+          stockDetailStore.saveAiReport(props.shcode, freshReport);
 
-        // 백엔드 report/ 폴더에 md 및 json 파일로 영구 저장
-        await persistReportToServer(freshReport);
-      } else if (analysisError.value) {
-        errorMessage.value = `[Claude AI 연동 경고]: ${analysisError.value}`;
+          // 백엔드 report/ 폴더에 md 및 json 파일로 영구 저장
+          await persistReportToServer(freshReport);
+        } else if (analysisError.value) {
+          errorMessage.value = `[Claude AI 연동 경고]: ${analysisError.value}`;
+        }
       }
     } else if (stockDetailStore.errorMessage) {
       errorMessage.value = stockDetailStore.errorMessage;

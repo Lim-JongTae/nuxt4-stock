@@ -1,16 +1,22 @@
+import { defineEventHandler } from 'h3';
 import { db } from '../../db';
 import { stocks, holdings, watchlist } from '../../db/schema';
 import { loadEnv, getLSToken, fetchLSPrice, fetchLSShortSellTrend, fetchLSMarketBasis, fetchLSSectorData, fetchLST1305Prices, calculateTechnicalIndicators } from '../../utils/lsApi';
 import { classifyShortSellSignal, type ShortSellRecord } from '../../utils/shortSellSignal';
 
 export default defineEventHandler(async (event) => {
-  const env = loadEnv();
-  const appKey = env.LS_APP_KEY || '';
-  const appSecret = env.LS_SECREAT || '';
+  try {
+    const env = loadEnv();
+    const appKey = env.LS_APP_KEY || '';
+    const appSecret = env.LS_SECREAT || '';
 
   const { token, error: tokenError } = await getLSToken(appKey, appSecret);
-  const marketBasis = await fetchLSMarketBasis(token || '');
-  const sectorData = await fetchLSSectorData(token || '');
+
+  // 선물 베이시스 및 업종 시세 데이터 병렬 수집으로 지연 제거
+  const [marketBasis, sectorData] = await Promise.all([
+    token ? fetchLSMarketBasis(token) : Promise.resolve(null),
+    token ? fetchLSSectorData(token) : Promise.resolve(null)
+  ]);
 
   // 1. SQLite DB (holdings + stocks + watchlist 테이블)에서 보유종목 + 관심종목 동적 마스터 로드
   const dbStocks = await db.select().from(stocks);
@@ -21,49 +27,64 @@ export default defineEventHandler(async (event) => {
 
   // 보유종목 추가
   dbHoldings.forEach(h => {
-    if (h.shcode && h.shcode.trim().length >= 4) {
-      stockMap.set(h.shcode.trim(), {
-        shcode: h.shcode.trim(),
+    const raw = String(h.shcode || '').trim();
+    const clean = raw.replace(/^A/i, '');
+    if (clean.length >= 4) {
+      const item = {
+        shcode: raw,
         name: h.name,
         industry: h.industry || '기타',
         isHolding: true,
         avgPrice: h.avgPrice || 0,
         quantity: h.quantity || 0
-      });
+      };
+      stockMap.set(raw, item);
+      stockMap.set(clean, item);
+      stockMap.set(`A${clean}`, item);
     }
   });
 
   // 관심종목(watchlist 테이블) 추가 -> isHolding: false
   dbWatchlist.forEach(w => {
-    if (w.shcode && w.shcode.trim().length >= 4 && !stockMap.has(w.shcode.trim())) {
-      stockMap.set(w.shcode.trim(), {
-        shcode: w.shcode.trim(),
+    const raw = String(w.shcode || '').trim();
+    const clean = raw.replace(/^A/i, '');
+    if (clean.length >= 4 && !stockMap.has(raw) && !stockMap.has(clean) && !stockMap.has(`A${clean}`)) {
+      const item = {
+        shcode: raw,
         name: w.name,
         industry: w.industry || '기타',
         isHolding: false,
         avgPrice: 0,
         quantity: 0
-      });
+      };
+      stockMap.set(raw, item);
+      stockMap.set(clean, item);
+      stockMap.set(`A${clean}`, item);
     }
   });
 
   // 관심종목(stocks 통합 마스터 테이블) 추가
   dbStocks.forEach(s => {
-    if (s.shcode && s.shcode.trim().length >= 4 && !stockMap.has(s.shcode.trim())) {
-      stockMap.set(s.shcode.trim(), {
-        shcode: s.shcode.trim(),
+    const raw = String(s.shcode || '').trim();
+    const clean = raw.replace(/^A/i, '');
+    if (clean.length >= 4 && !stockMap.has(raw) && !stockMap.has(clean) && !stockMap.has(`A${clean}`)) {
+      const item = {
+        shcode: raw,
         name: s.name,
         industry: s.industry || '기타',
         isHolding: s.type === 'holding',
         avgPrice: s.avgPrice || 0,
         quantity: s.quantity || 0
-      });
+      };
+      stockMap.set(raw, item);
+      stockMap.set(clean, item);
+      stockMap.set(`A${clean}`, item);
     }
   });
 
 
 
-  const candidateStocks = Array.from(stockMap.values());
+  const candidateStocks = Array.from(new Set(stockMap.values()));
 
   // 2. LS증권 Open API (t1102 실시간가, t1305 65일봉, t1927 공매도일별추이) 연동
   let apiCallNote = '';
@@ -72,22 +93,29 @@ export default defineEventHandler(async (event) => {
 
   if (token) {
     const BATCH_SIZE = 1;
-    const BATCH_DELAY_MS = 650; // LS API 초당 건수 제한 준수
+    const BATCH_DELAY_MS = 650;
 
     for (let i = 0; i < candidateStocks.length; i += BATCH_SIZE) {
       const batch = candidateStocks.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(batch.map(async (stock) => {
-        const [livePrice, htsPriceMap, shortSellTrend] = await Promise.all([
-          fetchLSPrice(token, stock.shcode),
+        const isEtf = stock.shcode.startsWith('US') || stock.name.includes('액티브') || stock.name.includes('KODEX') || stock.name.includes('SOL') || stock.name.includes('KoAct') || stock.name.includes('ETF') || stock.name.includes('TIGER') || stock.name.includes('ACE');
+
+        // ETF/ETN 종목은 t1927 공매도 API 호출 스킵
+        const shortSellPromise = isEtf ? Promise.resolve(null) : fetchLSShortSellTrend(token, stock.shcode);
+
+        // t8410 단일 차트 수신 (t1102 중복 호출 제거하여 LS API 초당 차단 방지)
+        const [htsPriceMap, shortSellTrend] = await Promise.all([
           fetchLST1305Prices(token, stock.shcode),
-          fetchLSShortSellTrend(token, stock.shcode)
+          shortSellPromise
         ]);
+
         const indicators = calculateTechnicalIndicators(htsPriceMap);
 
-        const latestPrice = livePrice || (htsPriceMap && htsPriceMap.size > 0 ? Array.from(htsPriceMap.values())[0]?.close : undefined);
+        const candleList = htsPriceMap && htsPriceMap.size > 0 ? Array.from(htsPriceMap.values()) : [];
+        const latestCandleClose = candleList.length > 0 ? candleList[candleList.length - 1]?.close : undefined;
 
         stockLiveMap.set(stock.shcode, {
-          price: latestPrice,
+          price: latestCandleClose,
           indicators,
           shortSellHistory: shortSellTrend || undefined
         });
@@ -130,10 +158,10 @@ export default defineEventHandler(async (event) => {
       0;
 
     const psy = liveData.indicators?.psy ?? null;
-    const bb_lower = liveData.indicators?.bbLower ?? (closePrice > 0 ? Math.round(closePrice * 0.95) : null);
-    const ma5 = liveData.indicators?.ma5 ?? (closePrice > 0 ? Math.round(closePrice * 0.99) : null);
+    const bb_lower = liveData.indicators?.bbLower ?? null;
+    const ma5 = liveData.indicators?.ma5 ?? null;
     const ma20 = liveData.indicators?.ma20 ?? null;
-    const ma60 = liveData.indicators?.ma60 ?? (closePrice > 0 ? Math.round(closePrice * 0.96) : null);
+    const ma60 = liveData.indicators?.ma60 ?? null;
     const volume_ratio = liveData.indicators?.volumeRatio ?? null;
     const macd_hist = liveData.indicators?.macdHist ?? null;
     const rsi = liveData.indicators?.rsi ?? null;
@@ -162,18 +190,10 @@ export default defineEventHandler(async (event) => {
     const cond_short_signal = shortSignal.label === "숏커버링(환매수) 유력" || shortSignal.label === "매수세가 공매도 흡수 중";
 
     let shortSignalScore = 0;
-    if (!shortSellHistory || shortSellHistory.length === 0 || isEtfOrForeign) {
-      // 공매도 데이터 미수집 또는 대상 제외 종목은 중립 보정 5점 부여
-      shortSignalScore = 5;
-    } else if (cond_short_signal) {
-      // 호재 신호: 신뢰도에 따른 스코어 차등 부여 (높음=10점, 중간=7점, 낮음=5점)
-      const shortSignalScoreMap: Record<string, number> = { "높음": 10, "중간": 7, "낮음": 5 };
-      shortSignalScore = shortSignalScoreMap[shortSignal.confidence] ?? 5;
-    } else if (shortSignal.label === "신규 공매도 유입") {
-      // 악재 신호: -5점 감점
-      shortSignalScore = -5;
+    if (cond_short_signal) {
+      const shortSignalScoreMap: Record<string, number> = { "높음": 15, "중간": 11, "낮음": 7 };
+      shortSignalScore = shortSignalScoreMap[shortSignal.confidence] ?? 7;
     } else {
-      // 보합 / 판단 보류: 0점
       shortSignalScore = 0;
     }
 
@@ -207,6 +227,17 @@ export default defineEventHandler(async (event) => {
       macdHist: macd_hist,
       rsi,
       bullishDivergence: bullish_divergence,
+      indicators: {
+        psy,
+        bbLower: bb_lower,
+        ma5,
+        ma20,
+        ma60,
+        volumeRatio: volume_ratio,
+        macdHist: macd_hist,
+        rsi,
+        bullishDivergence: bullish_divergence
+      },
       shortSignal,
       shortSellHistory,
       score,
@@ -246,51 +277,32 @@ export default defineEventHandler(async (event) => {
     return clean;
   };
 
-  let topSectors = (sectorData.topSectors || []).filter(s => s.name && !isMacroOrScale(s.name));
-  let bottomSectors = (sectorData.bottomSectors || []).filter(s => s.name && !isMacroOrScale(s.name));
+  const topSectors = (sectorData?.topSectors || []).filter(s => s.name && !isMacroOrScale(s.name));
+  const bottomSectors = (sectorData?.bottomSectors || []).filter(s => s.name && !isMacroOrScale(s.name));
 
-  const isAllZero = (list: typeof topSectors) => list.length === 0 || list.every(s => s.rate === 0);
-
-  if ((isAllZero(topSectors) || isAllZero(bottomSectors)) && newBatch.length > 0) {
-    const getStockRate = (s: typeof newBatch[0]): number => {
-      if (s.closePrice > 0 && s.ma20 && s.ma20 > 0) {
-        return Math.round(((s.closePrice - s.ma20) / s.ma20) * 10000) / 100;
-      }
-      return 0;
+    return {
+      success: true,
+      timestamp: localTime,
+      source: token
+        ? (priceFailCount > 0 ? `LS증권 Open API (t1102/t8410/t1927/t2111 부분 수신)` : 'LS증권 Open API (openapi.ls-sec.co.kr - t1102/t8410/t1927/t2111)')
+        : `LS증권 DB 데이터 (${apiCallNote})`,
+      error: priceFailCount > 0 ? apiCallNote : (tokenError || null),
+      newData: newBatch,
+      marketBasis,
+      topSectors,
+      bottomSectors
     };
-
-    const sectorMap = new Map<string, { totalRate: number; count: number }>();
-    newBatch.forEach(s => {
-      const ind = normalizeSectorName(s.industry || '기타');
-      if (!sectorMap.has(ind)) sectorMap.set(ind, { totalRate: 0, count: 0 });
-      const entry = sectorMap.get(ind)!;
-      const r = getStockRate(s);
-      entry.totalRate += r;
-      entry.count += 1;
-    });
-
-    const parsedSectors = Array.from(sectorMap.entries()).map(([name, val], idx) => ({
-      code: String(idx + 1).padStart(3, '0'),
-      name,
-      rate: Math.round((val.totalRate / val.count) * 100) / 100
-    }));
-
-    if (parsedSectors.length > 0) {
-      topSectors = [...parsedSectors].sort((a, b) => b.rate - a.rate).slice(0, 5);
-      bottomSectors = [...parsedSectors].sort((a, b) => a.rate - b.rate).slice(0, 5);
-    }
+  } catch (err: any) {
+    console.error('🔴 [screener/index.post.ts 500 내포 에러 방지]:', err);
+    return {
+      success: false,
+      timestamp: new Date().toLocaleString('ko-KR'),
+      source: 'LS증권 Open API 연동 예외 발생',
+      error: `서버 연동 예외 발생: ${err.message || String(err)}`,
+      newData: [],
+      marketBasis: null,
+      topSectors: [],
+      bottomSectors: []
+    };
   }
-
-  return {
-    success: true,
-    timestamp: localTime,
-    source: token
-      ? (priceFailCount > 0 ? `LS증권 Open API (t1102/t1305/t1927/t2111 부분 수신)` : 'LS증권 Open API (openapi.ls-sec.co.kr - t1102/t1305/t1927/t2111)')
-      : `LS증권 DB 데이터 (${apiCallNote})`,
-    error: priceFailCount > 0 ? apiCallNote : (tokenError || null),
-    newData: newBatch,
-    marketBasis,
-    topSectors,
-    bottomSectors
-  };
 });

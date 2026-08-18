@@ -116,15 +116,22 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
 import { useWatchlistStore } from '@/stores/useWatchlistStore';
+import { useGlobalToast } from '@/composables/useGlobalToast';
 
 const store = useWatchlistStore();
+const toast = useGlobalToast();
 
-onMounted(() => {
-  store.loadInitial(false);
+onMounted(async () => {
+  await store.loadInitial(false);
 });
 
-function refresh() {
-  store.loadInitial(true);
+async function refresh() {
+  try {
+    await store.refresh();
+    toast.success('LS증권 실시간 시세 및 8대 기술지표 갱신이 완료되었습니다.', '시세 갱신 완료');
+  } catch (err: any) {
+    toast.error(err.message || '시세 갱신 중 오류가 발생했습니다.', '시세 갱신 실패');
+  }
 }
 
 function isEtfItem(item: any): boolean {

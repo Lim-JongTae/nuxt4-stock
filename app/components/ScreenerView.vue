@@ -1,5 +1,21 @@
 <template>
   <div class="space-y-6">
+    <!-- 붉은색 오류 배너 (자료 수집 실패 시 명확한 오류 사유 표기) -->
+    <div 
+      v-if="screenerStore.errorMessage || rawStore.errorMessage" 
+      class="bg-rose-950/90 border-2 border-rose-500 rounded-2xl p-4 shadow-2xl flex items-center justify-between gap-4 text-rose-200 animate-pulse"
+    >
+      <div class="flex items-center gap-3">
+        <i class="fas fa-exclamation-triangle text-2xl text-rose-400 shrink-0"></i>
+        <div>
+          <h4 class="text-sm font-extrabold text-rose-300">LS증권 Open API 시세 수신 오류</h4>
+          <p class="text-xs text-rose-200 mt-0.5 font-mono">
+            {{ screenerStore.errorMessage || rawStore.errorMessage || 'LS증권 API 통신 실패 (가짜/대체 데이터 생성 금지 원칙 준수)' }}
+          </p>
+        </div>
+      </div>
+    </div>
+
     <!-- Screener Header & Controls -->
     <div class="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-4">
@@ -103,6 +119,46 @@
           <p class="text-[10px] text-slate-300 font-semibold truncate">
             {{ screenerStore.marketBasis ? screenerStore.marketBasis.basisStatus : '베이시스/OI/프로그램' }}
           </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dedicated LS Securities Top 3 Promising Sectors (상위 3대 유망업종) Banner -->
+    <div v-if="screenerStore.topSectors && screenerStore.topSectors.length > 0" class="bg-linear-to-r from-slate-900 via-purple-950/50 to-slate-900 border border-purple-500/40 rounded-2xl p-4 shadow-xl space-y-3">
+      <div class="flex items-center justify-between border-b border-purple-500/20 pb-2">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-400 flex items-center justify-center font-bold text-sm shrink-0 shadow-inner">
+            <i class="fas fa-trophy"></i>
+          </div>
+          <div>
+            <h4 class="text-xs font-extrabold text-white flex items-center gap-2">
+              <span>LS증권 선정 실시간 상위 3대 유망업종</span>
+              <span class="text-[10px] text-purple-300 font-mono bg-purple-950/80 px-2 py-0.5 rounded border border-purple-700/60">t8424 / t1531</span>
+            </h4>
+            <p class="text-[11px] text-slate-400">LS증권 업종별 등락률 수급 데이터를 실시간 분석하여 선정된 최상위 유망 섹터입니다.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Promising Sector Cards Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div 
+          v-for="(sec, idx) in screenerStore.topSectors.slice(0, 3)" 
+          :key="sec.code"
+          class="bg-slate-950/80 border border-purple-500/30 hover:border-purple-500/70 p-3 rounded-xl flex items-center justify-between transition-all shadow-md group"
+        >
+          <div class="flex items-center gap-2.5">
+            <span class="w-6 h-6 rounded-md bg-purple-500/20 text-purple-300 font-black text-xs flex items-center justify-center border border-purple-500/40">
+              {{ idx + 1 }}
+            </span>
+            <div>
+              <span class="text-xs font-bold text-white group-hover:text-purple-300 transition-colors block">{{ sec.name }}</span>
+              <span class="text-[10px] text-slate-400 font-mono">코드: {{ sec.code }}</span>
+            </div>
+          </div>
+          <span class="text-xs font-mono font-extrabold px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/30 shadow-xs">
+            +{{ Number(sec.rate).toFixed(2) }}%
+          </span>
         </div>
       </div>
     </div>
@@ -447,11 +503,13 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue';
 import { useScreenerStore, type StockItem } from '~/stores/useScreenerStore';
+import { useLSStockRawStore } from '~/stores/useLSStockRawStore';
 import ShortSellReportModal from '~/components/shortselling/ShortSellReportModal.vue';
 import StockDetailModal from '~/components/StockDetailModal.vue';
 import { logShortSellQuantitativeReport } from '~/utils/shortSellReportLogger';
 
 const screenerStore = useScreenerStore();
+const rawStore = useLSStockRawStore();
 const isShortSellModalOpen = ref(false);
 const selectedShortStock = ref<any>(null);
 

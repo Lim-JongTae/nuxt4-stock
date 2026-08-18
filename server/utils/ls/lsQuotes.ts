@@ -9,39 +9,32 @@ export async function fetchLSPrice(
   const rawCode = sanitizeDomesticShcode(shcode);
   if (!rawCode) return null;
 
-  const urls = [
-    'https://openapi.ls-sec.co.kr:8080/stock/market-data',
-    'https://openapi.ls-sec.co.kr/stock/market-data'
-  ];
-
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json; charset=utf-8',
-          'authorization': 'Bearer ' + token,
-          'tr_cd': 't1102',
-          'tr_cont': 'N'
-        },
-        body: JSON.stringify({
-          t1102InBlock: {
-            shcode: rawCode
-          }
-        }),
-        signal: AbortSignal.timeout(2500)
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.t1102OutBlock && data.t1102OutBlock.price) {
-          const price = parseLSNumber(data.t1102OutBlock.price);
-          if (price > 0) return price;
+  try {
+    const res = await fetch('https://openapi.ls-sec.co.kr:8080/stock/market-data', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'authorization': 'Bearer ' + token,
+        'tr_cd': 't1102',
+        'tr_cont': 'N'
+      },
+      body: JSON.stringify({
+        t1102InBlock: {
+          shcode: rawCode
         }
+      }),
+      signal: AbortSignal.timeout(5000)
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.t1102OutBlock && data.t1102OutBlock.price) {
+        const price = parseLSNumber(data.t1102OutBlock.price);
+        if (price > 0) return price;
       }
-    } catch (e: any) {
-      console.warn(`⚠️ [LS증권 t1102 현재가 API 수신 실패 - ${shcode}]:`, e.message || String(e));
     }
+  } catch (e: any) {
+    console.error(`🔴 [LS증권 t1102 시세 수신 실패 - ${shcode}]:`, e.message || String(e));
   }
   return null;
 }
@@ -73,97 +66,80 @@ export async function fetchLST1305Prices(
   const sdate = formatDateYYYYMMDD(past);
   const edate = formatDateYYYYMMDD(new Date());
 
-  const urls = [
-    'https://openapi.ls-sec.co.kr:8080/stock/chart',
-    'https://openapi.ls-sec.co.kr/stock/chart'
-  ];
-
-  // LS증권 초당 호출 제한 대처: 1회 실패 시 650ms 지연 후 자동 재시도
-  for (let attempt = 0; attempt < 2; attempt++) {
-    if (attempt > 0) {
-      await new Promise(r => setTimeout(r, 650));
-    }
-
-    for (const url of urls) {
-      try {
-        const res = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json; charset=utf-8',
-            'authorization': 'Bearer ' + token,
-            'tr_cd': 't8413',
-            'tr_cont': 'N'
-          },
-          body: JSON.stringify({
-            t8413InBlock: {
-              shcode: rawCode,
-              gubun: '2', // 2: 일봉
-              qrycnt: 100,
-              sdate: sdate,
-              edate: edate,
-              cts_date: '',
-              comp_yn: 'N',
-              exchgubun: 'U' // 'U': 통합시세 (KRX + NXT 통합 종가 전용!)
-            }
-          }),
-          signal: AbortSignal.timeout(2500)
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          const rows = data.t8413OutBlock1 || data.t8413OutBlock;
-          if (Array.isArray(rows) && rows.length > 0) {
-            rows.forEach((r: any) => {
-              const rawDate = String(r.date || '').trim();
-              const formattedDate = rawDate.length === 8 
-                ? `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`
-                : rawDate;
-              const closePrice = parseLSNumber(r.close);
-              const openPrice = parseLSNumber(r.open);
-              const highPrice = parseLSNumber(r.high);
-              const lowPrice = parseLSNumber(r.low);
-              const volume = parseLSNumber(r.jdiff_vol) || parseLSNumber(r.volume);
-
-              if (formattedDate && closePrice > 0) {
-                htsMap.set(formattedDate, {
-                  close: closePrice,
-                  open: openPrice,
-                  high: highPrice,
-                  low: lowPrice,
-                  volume
-                });
-              }
-            });
-
-            // 오늘 날짜 데이터는 t1102 실시간가가 전달되면 덮어씀 (high/low 캔들 왜곡 방지 보정)
-            if (externalLivePrice && externalLivePrice > 0) {
-              const todayStr = formatDateYYYYMMDD(new Date());
-              const formattedToday = `${todayStr.slice(0, 4)}-${todayStr.slice(4, 6)}-${todayStr.slice(6, 8)}`;
-              const existing = htsMap.get(formattedToday);
-              if (existing) {
-                existing.close = externalLivePrice;
-                if (externalLivePrice > existing.high) existing.high = externalLivePrice;
-                if (existing.low === 0 || externalLivePrice < existing.low) existing.low = externalLivePrice;
-              } else {
-                htsMap.set(formattedToday, {
-                  close: externalLivePrice,
-                  open: externalLivePrice,
-                  high: externalLivePrice,
-                  low: externalLivePrice,
-                  volume: 0
-                });
-              }
-            }
-
-            if (htsMap.size > 0) break;
-          }
+  try {
+    const res = await fetch('https://openapi.ls-sec.co.kr:8080/stock/chart', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'authorization': 'Bearer ' + token,
+        'tr_cd': 't8410',
+        'tr_cont': 'N'
+      },
+      body: JSON.stringify({
+        t8410InBlock: {
+          shcode: rawCode,
+          gubun: '2',      // 2: 일봉
+          qrycnt: 100,    // 요청건수 100건
+          sdate: sdate,   // 시작일자 YYYYMMDD
+          edate: edate,   // 종료일자 YYYYMMDD
+          cts_date: '',
+          comp_yn: 'N',
+          sujung: 'Y'     // 수정주가 적용
         }
-      } catch (e: any) {
-        console.warn(`⚠️ [LS증권 t8413 통합시세 API 수신 실패 - ${shcode}]:`, e.message || String(e));
+      }),
+      signal: AbortSignal.timeout(5000)
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      // t8410OutBlock1 일봉 캔들 배열 파싱
+      const rows = data.t8410OutBlock1 || data.t8410OutBlock;
+      if (Array.isArray(rows) && rows.length > 0) {
+        rows.forEach((r: any) => {
+          const rawDate = String(r.date || '').trim();
+          const formattedDate = rawDate.length === 8 
+            ? `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`
+            : rawDate;
+          const closePrice = parseLSNumber(r.close);
+          const openPrice = parseLSNumber(r.open);
+          const highPrice = parseLSNumber(r.high);
+          const lowPrice = parseLSNumber(r.low);
+          const volume = parseLSNumber(r.jdiff_vol) || parseLSNumber(r.volume);
+
+          if (formattedDate && closePrice > 0) {
+            htsMap.set(formattedDate, {
+              close: closePrice,
+              open: openPrice,
+              high: highPrice,
+              low: lowPrice,
+              volume
+            });
+          }
+        });
       }
     }
+  } catch (e: any) {
+    console.error(`🔴 [LS증권 t8410 API전용 차트 수신 실패 - ${shcode}]:`, e.message || String(e));
+  }
 
-    if (htsMap.size > 0) break;
+  // 오늘 날짜 데이터는 externalLivePrice 실시간가가 전달되면 덮어씀
+  if (externalLivePrice && externalLivePrice > 0) {
+    const todayStr = formatDateYYYYMMDD(new Date());
+    const formattedToday = `${todayStr.slice(0, 4)}-${todayStr.slice(4, 6)}-${todayStr.slice(6, 8)}`;
+    const existing = htsMap.get(formattedToday);
+    if (existing) {
+      existing.close = externalLivePrice;
+      if (externalLivePrice > existing.high) existing.high = externalLivePrice;
+      if (existing.low === 0 || externalLivePrice < existing.low) existing.low = externalLivePrice;
+    } else {
+      htsMap.set(formattedToday, {
+        close: externalLivePrice,
+        open: externalLivePrice,
+        high: externalLivePrice,
+        low: externalLivePrice,
+        volume: 0
+      });
+    }
   }
 
   return htsMap.size > 0 ? htsMap : null;

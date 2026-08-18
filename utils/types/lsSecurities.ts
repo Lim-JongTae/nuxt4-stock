@@ -233,7 +233,7 @@ export interface StockItem {
   shortSellHistory?: ShortSellRecord[];
   dataSource?: string;
   errorMessage?: string | null;
-  createdAt: string;
+  createdAt?: string;
 }
 
 // 14. 시장 베이시스 및 선물/옵션 지표 구조

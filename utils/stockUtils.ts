@@ -101,7 +101,16 @@ export function arrayToMap<T extends Record<string, any>>(
   keyField: keyof T = 'shcode' as keyof T
 ): Map<string, T> {
   if (!Array.isArray(items)) return new Map();
-  return new Map(items.map(item => [String(item[keyField]), item]));
+  const map = new Map<string, T>();
+  items.forEach(item => {
+    const rawKey = String(item[keyField] ?? '');
+    if (!rawKey) return;
+    const cleanKey = sanitizeShcode(rawKey);
+    map.set(rawKey, item);
+    map.set(cleanKey, item);
+    map.set(`A${cleanKey}`, item);
+  });
+  return map;
 }
 
 /**
@@ -112,7 +121,16 @@ export function arrayToIndexMap<T extends Record<string, any>>(
   keyField: keyof T = 'shcode' as keyof T
 ): Map<string, number> {
   if (!Array.isArray(items)) return new Map();
-  return new Map(items.map((item, idx) => [String(item[keyField]), idx]));
+  const map = new Map<string, number>();
+  items.forEach((item, idx) => {
+    const rawKey = String(item[keyField] ?? '');
+    if (!rawKey) return;
+    const cleanKey = sanitizeShcode(rawKey);
+    map.set(rawKey, idx);
+    map.set(cleanKey, idx);
+    map.set(`A${cleanKey}`, idx);
+  });
+  return map;
 }
 
 /**

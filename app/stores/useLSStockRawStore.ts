@@ -39,7 +39,13 @@ export const useLSStockRawStore = defineStore('lsStockRaw', {
 
     rawStockMap: (state) => {
       const map = new Map<string, StockItem>();
-      state.rawStockList.forEach(item => map.set(item.shcode, item));
+      state.rawStockList.forEach(item => {
+        if (!item.shcode) return;
+        const cleanCode = item.shcode.trim().replace(/^A/i, '');
+        map.set(item.shcode, item);
+        map.set(cleanCode, item);
+        map.set(`A${cleanCode}`, item);
+      });
       return map;
     },
 
@@ -149,13 +155,10 @@ export const useLSStockRawStore = defineStore('lsStockRaw', {
     },
 
     async fetchRawStockData(forceRefresh = false) {
+      // 1. Storage에서 기존 데이터 빠른 복원 (0ms 초기 UI 표시)
       this.initFromStorage();
 
-      if (!forceRefresh && this.rawStockList && this.rawStockList.length > 0) {
-        return;
-      }
-
-      if (inFlightFetchPromise) {
+      if (!forceRefresh && inFlightFetchPromise) {
         return inFlightFetchPromise;
       }
 
@@ -164,13 +167,14 @@ export const useLSStockRawStore = defineStore('lsStockRaw', {
 
       inFlightFetchPromise = (async () => {
         try {
-          const response = await $fetch<ScreenerApiResponse>('/api/screener', {
-            method: 'POST'
+          const response = await $fetch<ScreenerApiResponse>(`/api/screener?ts=${Date.now()}`, {
+            method: 'POST',
+            headers: { 'Cache-Control': 'no-cache' }
           });
 
           if (response && response.success) {
             if (response.newData && response.newData.length > 0) {
-              this.rawStockList = response.newData;
+              this.rawStockList = [...response.newData];
             }
             if (response.marketBasis) {
               this.marketBasis = response.marketBasis;
@@ -189,6 +193,15 @@ export const useLSStockRawStore = defineStore('lsStockRaw', {
             }
 
             this.saveToStorage();
+
+            // ✅ 시세 수집 완료 후 Screener 및 Portfolio 실시간 시세 동기화
+            try {
+              const screenerStore = useScreenerStore();
+              screenerStore.recalculateFromRaw();
+
+              const portfolioStore = usePortfolioStore();
+              portfolioStore.syncLivePrices();
+            } catch {}
           } else if (response && response.error) {
             this.errorMessage = response.error;
           }
@@ -208,7 +221,8 @@ export const useLSStockRawStore = defineStore('lsStockRaw', {
 
       // ✅ 백업: 롤백을 위한 원본 데이터 저장
       const existingIdx = this.rawStockList.findIndex(s => s.shcode === cleanCode || s.shcode === `A${cleanCode}`);
-      const backup = existingIdx !== -1 ? { ...this.rawStockList[existingIdx] } : null;
+      const existingItem = existingIdx !== -1 ? this.rawStockList[existingIdx] : null;
+      const backup: StockItem | null = existingItem ? { ...existingItem } : null;
       const listBackup = [...this.rawStockList];
 
       // 1. Pinia Store state 즉시 추가 (낙관적 업데이트)
@@ -224,11 +238,12 @@ export const useLSStockRawStore = defineStore('lsStockRaw', {
         holdingQuantity: stockForm.type === 'holding' ? (Number(stockForm.quantity) || 0) : undefined,
         holdingAvgPrice: stockForm.type === 'holding' ? (Number(stockForm.avgPrice) || 0) : undefined,
         score: 0,
-        isFullyMatched: false
+        isFullyMatched: false,
+        createdAt: new Date().toISOString()
       };
 
-      if (existingIdx !== -1) {
-        this.rawStockList[existingIdx] = { ...this.rawStockList[existingIdx], ...newItem };
+      if (existingIdx !== -1 && existingItem) {
+        this.rawStockList[existingIdx] = { ...existingItem, ...newItem };
       } else {
         this.rawStockList.push(newItem);
       }
@@ -245,7 +260,7 @@ export const useLSStockRawStore = defineStore('lsStockRaw', {
         // ✅ 롤백: 서버 실패 시 원본 상태로 복구
         console.error('Store addStock DB sync error - Rolling back:', err);
 
-        if (backup) {
+        if (backup && existingIdx !== -1) {
           // 기존 종목 업데이트였던 경우: 원본으로 복구
           this.rawStockList[existingIdx] = backup;
         } else {
@@ -263,14 +278,15 @@ export const useLSStockRawStore = defineStore('lsStockRaw', {
 
       // ✅ 백업: 롤백을 위한 원본 데이터 저장
       const idx = this.rawStockList.findIndex(s => s.shcode === cleanCode || s.shcode === `A${cleanCode}`);
-      if (idx === -1) {
+      const targetItem = this.rawStockList[idx];
+      if (idx === -1 || !targetItem) {
         throw new Error(`종목을 찾을 수 없습니다: ${cleanCode}`);
       }
 
-      const backup = { ...this.rawStockList[idx] };
+      const backup: StockItem = { ...targetItem };
 
       // 1. Pinia Store state 즉시 수정 (낙관적 업데이트)
-      const item = this.rawStockList[idx]!;
+      const item = targetItem;
       item.name = stockForm.name.trim();
       item.industry = stockForm.industry.trim();
       item.type = stockForm.type;
@@ -307,17 +323,59 @@ export const useLSStockRawStore = defineStore('lsStockRaw', {
 
       // ✅ 백업: 롤백을 위한 원본 데이터 저장
       const listBackup = [...this.rawStockList];
-      const deletedItem = this.rawStockList.find(s => s.shcode === cleanCode || s.shcode === `A${cleanCode}`);
 
-      if (!deletedItem) {
-        throw new Error(`종목을 찾을 수 없습니다: ${cleanCode}`);
-      }
+      // 1. Pinia Store state 즉시 제거 (cleanCode 기준 완전 필터링)
+      this.rawStockList = this.rawStockList.filter(s => {
+        const itemClean = (s.shcode || '').trim().replace(/^A/i, '');
+        return itemClean !== cleanCode;
+      });
 
-      // 1. Pinia Store state 즉시 제거
-      this.rawStockList = this.rawStockList.filter(s => s.shcode !== cleanCode && s.shcode !== `A${cleanCode}`);
+      // ✅ 2. LocalStorage의 모든 과거/현재 캐시 키에서 삭제 대상 종목 완전 영구 소멸
+      try {
+        const keysToClean: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith(RAW_CACHE_PREFIX) || k.startsWith('nuxt_watchlist_cache_') || k.startsWith('nuxt_updown_screener_') || k.startsWith('nuxt4_stock_screener_cache'))) {
+            keysToClean.push(k);
+          }
+        }
+
+        keysToClean.forEach(key => {
+          try {
+            const raw = localStorage.getItem(key);
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              let modified = false;
+              if (parsed.rawStockList && Array.isArray(parsed.rawStockList)) {
+                parsed.rawStockList = parsed.rawStockList.filter((s: any) => (s.shcode || '').trim().replace(/^A/i, '') !== cleanCode);
+                modified = true;
+              }
+              if (parsed.items && Array.isArray(parsed.items)) {
+                parsed.items = parsed.items.filter((s: any) => (s.shcode || '').trim().replace(/^A/i, '') !== cleanCode);
+                modified = true;
+              }
+              if (modified) {
+                localStorage.setItem(key, JSON.stringify(parsed));
+              }
+            }
+          } catch {}
+        });
+      } catch {}
+
       this.saveToStorage();
 
-      // 2. Store action에서 SQLite DB 삭제 연동
+      // 3. 파생 스토어 (screenerStore 및 watchlistStore) state에서도 즉시 제거
+      try {
+        const screenerStore = useScreenerStore();
+        screenerStore.newData = screenerStore.newData.filter(s => (s.shcode || '').trim().replace(/^A/i, '') !== cleanCode);
+        screenerStore.oldData = screenerStore.oldData.filter(s => (s.shcode || '').trim().replace(/^A/i, '') !== cleanCode);
+
+        const watchlistStore = useWatchlistStore();
+        watchlistStore.items = watchlistStore.items.filter(it => (it.shcode || '').trim().replace(/^A/i, '') !== cleanCode);
+        watchlistStore.saveToStorage();
+      } catch {}
+
+      // 4. Store action에서 SQLite DB 삭제 연동
       try {
         await $fetch(`/api/stocks/${cleanCode}`, {
           method: 'DELETE'
