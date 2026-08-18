@@ -210,7 +210,26 @@ export default defineEventHandler(async (event) => {
 
     // 공매도 신호 분류 및 스코어링 (Option 1: 보조 지표 방식)
     const isEtfOrForeign = s.shcode.startsWith('US') || s.name.includes('액티브') || s.name.includes('KODEX') || s.name.includes('SOL') || s.name.includes('KoAct') || s.name.includes('ETF');
-    const shortSignal = classifyShortSellSignal(shortSellHistory, isEtfOrForeign);
+
+    // DTC 계산: 공매도 누적 잔고수량 / 20일 평균 거래량
+    let dtc: number | null = null;
+    if (shortSellHistory.length > 0) {
+      const latestShort = shortSellHistory[0];
+      const shortVolume = latestShort?.shortVolume;
+
+      if (shortVolume && shortVolume > 0) {
+        // 20일 평균 거래량 계산
+        const recentRecords = shortSellHistory.slice(0, Math.min(20, shortSellHistory.length));
+        const totalVolume = recentRecords.reduce((sum, r) => sum + (r.volume || 0), 0);
+        const avgDailyVolume = totalVolume / recentRecords.length;
+
+        if (avgDailyVolume > 0) {
+          dtc = Number((shortVolume / avgDailyVolume).toFixed(2));
+        }
+      }
+    }
+
+    const shortSignal = classifyShortSellSignal(shortSellHistory, isEtfOrForeign, dtc);
     const cond_short_signal = shortSignal.label === "숏커버링(환매수) 유력" || shortSignal.label === "매수세가 공매도 흡수 중";
 
     let shortSignalScore = 0;

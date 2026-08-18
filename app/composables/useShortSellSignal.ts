@@ -19,8 +19,16 @@ function safeParseTimestamp(dateStr: string): number {
 /**
  * 최근 공매도 시계열 데이터로 5일 누적 추세(잔고비율 %p, 주가 %, 거래량 %)를 계산하여
  * 노이즈를 제거하고 4가지 라벨 및 신뢰도(5일 이상: 높음, 3~4일: 중간, 2일 이하: 낮음)를 분석하는 함수
+ *
+ * @param shortSellData - LS증권 t1927 공매도 시계열 데이터
+ * @param isEtfOrForeign - ETF/ETN 또는 해외 주식 여부
+ * @param dtc - Days to Cover (공매도 청산 소요일수: 누적 잔고수량 / 20일 평균 거래량)
  */
-export function classifyShortSellSignal(shortSellData: ShortSellRecord[], isEtfOrForeign?: boolean): ShortSellSignalResult {
+export function classifyShortSellSignal(
+  shortSellData: ShortSellRecord[],
+  isEtfOrForeign?: boolean,
+  dtc?: number | null
+): ShortSellSignalResult {
   if (isEtfOrForeign) {
     return {
       label: "판단 보류",
@@ -108,19 +116,51 @@ export function classifyShortSellSignal(shortSellData: ShortSellRecord[], isEtfO
     ? Number((((latest.volume - avgVolume) / avgVolume) * 100).toFixed(2))
     : 0;
 
-  // 4가지 라벨 추세 분류
-  // - balanceRatioDiff <= -0.01: 공매도 잔고 유의미 감소 -> 숏커버링 유력
-  // - balanceRatioDiff >= 0.01 && priceDiffRate < 0: 잔고 증가 & 주가 하락 -> 신규 공매도 유입
-  // - balanceRatioDiff >= 0.01 && priceDiffRate >= 0: 잔고 증가 & 주가 상승/보합 -> 매수세가 공매도 흡수 중
-  // - 그 외 (잔고 변동 미미): 판단 보류
+  // ✅ 개선된 4가지 라벨 추세 분류 (DTC, 절대 잔고비율, 거래량 급증 반영)
+  //
+  // 1) 숏커버링(환매수) 유력:
+  //    - 잔고비율 감소 (≤ -0.01%p) 또는 (DTC 하락 추세 + 거래량 급증 + 주가 상승)
+  //    - 공매도 세력이 청산(환매수) 중인 신호
+  //
+  // 2) 신규 공매도 유입:
+  //    - 잔고비율 증가 (≥ +0.01%p) + 주가 하락
+  //    - 공매도 세력이 하락 베팅 중
+  //
+  // 3) 매수세가 공매도 흡수 중:
+  //    - 잔고비율 증가 (≥ +0.01%p) + 주가 상승/보합
+  //    - 공매도가 늘어남에도 매수세가 압도
+  //
+  // 4) 판단 보류:
+  //    - 잔고 변동 미미 (-0.01%p ~ +0.01%p 범위)
+
   let label: ShortSellSignalResult["label"] = "판단 보류";
-  if (balanceRatioDiff <= -0.01) { // -0.01%p 이하 감소 (경계값 포함)
+
+  // 절대 잔고비율이 높은지 판단 (5% 이상 = 고위험 구간)
+  const isHighShortRatio = latest.balanceRatio >= 5.0;
+
+  // 거래량이 평균 대비 30% 이상 급증했는지 판단
+  const isVolumeSpike = volumeDiffRate >= 30;
+
+  // DTC 값 유효성 확인 (DTC > 0)
+  const hasDtc = typeof dtc === 'number' && !isNaN(dtc) && dtc > 0;
+
+  if (balanceRatioDiff <= -0.01) {
+    // 📉 잔고비율 유의미 감소 -> 숏커버링 신호
     label = "숏커버링(환매수) 유력";
-  } else if (balanceRatioDiff >= 0.01 && priceDiffRate < 0) {
+  } else if (balanceRatioDiff <= -0.005 && priceDiffRate >= 1.0 && isVolumeSpike) {
+    // 📉 잔고 소폭 감소 + 주가 상승 + 거래량 급증 -> 숏커버링 가능성
+    label = "숏커버링(환매수) 유력";
+  } else if (balanceRatioDiff >= 0.01 && priceDiffRate < -1.0) {
+    // 📈 잔고 증가 + 주가 유의미 하락 -> 신규 공매도 유입
     label = "신규 공매도 유입";
   } else if (balanceRatioDiff >= 0.01 && priceDiffRate >= 0) {
+    // 📈 잔고 증가 + 주가 상승/보합 -> 매수세 흡수
     label = "매수세가 공매도 흡수 중";
+  } else if (isHighShortRatio && hasDtc && dtc >= 3.0 && priceDiffRate >= 2.0 && isVolumeSpike) {
+    // 🚨 숏스퀴즈 조건: 고잔고비율 + 고DTC + 주가급등 + 거래량폭증
+    label = "숏커버링(환매수) 유력";
   } else {
+    // 변동 미미 -> 판단 보류
     label = "판단 보류";
   }
 
@@ -152,8 +192,14 @@ export function classifyShortSellSignal(shortSellData: ShortSellRecord[], isEtfO
   const signRatio = balanceRatioDiff > 0 ? `+${balanceRatioDiff}` : `${balanceRatioDiff}`;
   const signPrice = priceDiffRate > 0 ? `+${priceDiffRate}` : `${priceDiffRate}`;
   const signVol = volumeDiffRate > 0 ? `+${volumeDiffRate}` : `${volumeDiffRate}`;
+  const dtcInfo = hasDtc ? `, DTC ${dtc!.toFixed(2)}일` : '';
 
-  const summary = `${daysCount}일 수급: 잔고 ${signRatio}%p, 주가 ${signPrice}%, 거래량 ${signVol}% → "${label}"`;
+  let summary = `${daysCount}일 수급: 잔고 ${signRatio}%p, 주가 ${signPrice}%, 거래량 ${signVol}%${dtcInfo} → "${label}"`;
+
+  // 숏스퀴즈 위험 경고 (고잔고비율 + 고DTC)
+  if (isHighShortRatio && hasDtc && dtc! >= 3.0) {
+    summary += ` ⚠️ 잔고비율 ${latest.balanceRatio.toFixed(2)}%, DTC ${dtc!.toFixed(2)}일로 숏스퀴즈 경계 구간입니다.`;
+  }
 
   return {
     label,

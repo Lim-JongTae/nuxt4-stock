@@ -46,6 +46,23 @@ export function calculateQuantIndicators(raw: RawStockApiData): CalculatedStockD
   // ETF/ETN 종목 여부 자동 판별
   const isEtf = isEtfOrEtn(name || '', industry);
 
+  // DTC 계산: 공매도 누적 잔고수량 / 20일 평균 거래량
+  let dtc: number | null = null;
+  if (shortSellHistory && shortSellHistory.length > 0) {
+    const latestShort = shortSellHistory[0];
+    const shortVolume = latestShort?.shortVolume;
+
+    if (shortVolume && shortVolume > 0) {
+      const recentRecords = shortSellHistory.slice(0, Math.min(20, shortSellHistory.length));
+      const totalVolume = recentRecords.reduce((sum, r) => sum + (r.volume || 0), 0);
+      const avgDailyVolume = totalVolume / recentRecords.length;
+
+      if (avgDailyVolume > 0) {
+        dtc = Number((shortVolume / avgDailyVolume).toFixed(2));
+      }
+    }
+  }
+
   // 8대 지표 조건 검사 & 퀀트 스코어 비즈니스 계산
   const cond_psy = typeof psy === 'number' && psy <= 25.0;
   const cond_bb = typeof closePrice === 'number' && closePrice > 0 && typeof bbLower === 'number' && bbLower > 0 && closePrice <= (bbLower * BOLLINGER_BAND_TOLERANCE_RATE);
@@ -56,8 +73,8 @@ export function calculateQuantIndicators(raw: RawStockApiData): CalculatedStockD
   const cond_rsi = typeof rsi === 'number' && rsi <= 35.0;
   const cond_divergence = bullishDivergence === true;
 
-  // 공매도 신호 분류 (ETF/ETN 종목은 자동 제외 처리)
-  const shortSignal = classifyShortSellSignal(shortSellHistory, isEtf);
+  // 공매도 신호 분류 (ETF/ETN 종목은 자동 제외 처리, DTC 값 전달)
+  const shortSignal = classifyShortSellSignal(shortSellHistory, isEtf, dtc);
   const cond_short_signal = shortSignal.label === "숏커버링(환매수) 유력" || shortSignal.label === "매수세가 공매도 흡수 중";
 
   // 공매도 수급 신호 스코어링

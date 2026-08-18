@@ -109,7 +109,25 @@ export default defineEventHandler(async (event) => {
       // t1927 공매도
       const shortRecords = await fetchLSShortSellTrend(token, cleanCode, priceData);
       const isEtfOrForeign = cleanCode.startsWith('US') || (stock.name || '').includes('ETF') || (stock.name || '').includes('KODEX');
-      const shortSignal = classifyShortSellSignal(shortRecords || [], isEtfOrForeign);
+
+      // DTC 계산: 공매도 누적 잔고수량 / 20일 평균 거래량
+      let dtc: number | null = null;
+      if (shortRecords && shortRecords.length > 0) {
+        const latestShort = shortRecords[0];
+        const shortVolume = latestShort?.shortVolume;
+
+        if (shortVolume && shortVolume > 0) {
+          const recentRecords = shortRecords.slice(0, Math.min(20, shortRecords.length));
+          const totalVolume = recentRecords.reduce((sum, r) => sum + (r.volume || 0), 0);
+          const avgDailyVolume = totalVolume / recentRecords.length;
+
+          if (avgDailyVolume > 0) {
+            dtc = Number((shortVolume / avgDailyVolume).toFixed(2));
+          }
+        }
+      }
+
+      const shortSignal = classifyShortSellSignal(shortRecords || [], isEtfOrForeign, dtc);
 
       const candleArray = candles && candles.size > 0 ? Array.from(candles.values()) : [];
       const latestCandlePrice = candleArray.length > 0 ? candleArray[candleArray.length - 1]?.close : 0;
