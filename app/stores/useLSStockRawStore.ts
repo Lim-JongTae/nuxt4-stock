@@ -158,12 +158,33 @@ export const useLSStockRawStore = defineStore('lsStockRaw', {
       // 1. Storage에서 기존 데이터 빠른 복원 (0ms 초기 UI 표시)
       this.initFromStorage();
 
+      // 2. 오늘 날짜 데이터가 이미 있고 강제 새로고침이 아니면 API 호출 스킵
+      const todayKey = getTodayRawKey();
+      const hasTodayData = !!localStorage.getItem(todayKey);
+
+      if (!forceRefresh && hasTodayData && this.rawStockList.length > 0) {
+        console.log('✅ [useLSStockRawStore] 오늘 날짜 캐시 데이터 사용 (API 호출 스킵):', {
+          todayKey,
+          stockCount: this.rawStockList.length,
+          lastUpdated: this.lastUpdated,
+          topSectorsCount: this.topSectors.length
+        });
+        return;
+      }
+
+      // 3. 중복 API 호출 방지 (동시 요청 제어)
       if (!forceRefresh && inFlightFetchPromise) {
         return inFlightFetchPromise;
       }
 
       this.isLoading = true;
       this.errorMessage = null;
+
+      console.log('🔄 [useLSStockRawStore] LS증권 API 호출 시작:', {
+        forceRefresh,
+        hasTodayData,
+        reason: forceRefresh ? '강제 새로고침 (시세갱신 버튼)' : '오늘 날짜 데이터 없음'
+      });
 
       inFlightFetchPromise = (async () => {
         try {
@@ -177,7 +198,8 @@ export const useLSStockRawStore = defineStore('lsStockRaw', {
             console.log('📊 [useLSStockRawStore] API 응답 성공:', {
               newDataCount: response.newData?.length || 0,
               topSectorsCount: response.topSectors?.length || 0,
-              sample: JSON.parse(JSON.stringify(response.newData?.[0] || {}))
+              bottomSectorsCount: response.bottomSectors?.length || 0,
+              marketBasis: response.marketBasis
             });
 
             if (response.newData && response.newData.length > 0) {
@@ -189,7 +211,7 @@ export const useLSStockRawStore = defineStore('lsStockRaw', {
             }
             if (response.topSectors) {
               this.topSectors = response.topSectors;
-              console.log('✅ topSectors 업데이트:', this.topSectors.length, '개');
+              console.log('✅ topSectors 업데이트:', this.topSectors.length, '개', response.topSectors);
             }
             if (response.bottomSectors) {
               this.bottomSectors = response.bottomSectors;
@@ -201,7 +223,9 @@ export const useLSStockRawStore = defineStore('lsStockRaw', {
               this.sourceProvider = response.source;
             }
 
+            // 4. Store 데이터를 오늘 날짜 키로 LocalStorage에 저장 (덮어쓰기)
             this.saveToStorage();
+            console.log('💾 [useLSStockRawStore] LocalStorage 저장 완료:', todayKey);
 
             // ✅ 시세 수집 완료 후 Screener 및 Portfolio 실시간 시세 동기화
             try {
@@ -216,6 +240,7 @@ export const useLSStockRawStore = defineStore('lsStockRaw', {
           }
         } catch (err: any) {
           this.errorMessage = err.statusMessage || err.message || 'LS증권 시세 수집 중 오류가 발생했습니다.';
+          console.error('🔴 [useLSStockRawStore] API 호출 실패:', this.errorMessage);
         } finally {
           this.isLoading = false;
           inFlightFetchPromise = null;

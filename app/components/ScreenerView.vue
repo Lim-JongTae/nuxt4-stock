@@ -124,7 +124,7 @@
     </div>
 
     <!-- Dedicated LS Securities Top 5 Promising Sectors (상위 5대 유망업종) Banner -->
-    <div v-if="rawStore.topSectors && rawStore.topSectors.length > 0" class="bg-linear-to-r from-slate-900 via-purple-950/50 to-slate-900 border border-purple-500/40 rounded-2xl p-4 shadow-xl space-y-3">
+    <div class="bg-linear-to-r from-slate-900 via-purple-950/50 to-slate-900 border border-purple-500/40 rounded-2xl p-4 shadow-xl space-y-3">
       <div class="flex items-center justify-between border-b border-purple-500/20 pb-2">
         <div class="flex items-center gap-2.5">
           <div class="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-400 flex items-center justify-center font-bold text-sm shrink-0 shadow-inner">
@@ -138,10 +138,13 @@
             <p class="text-[11px] text-slate-400">LS증권 업종별 등락률 수급 데이터를 실시간 분석하여 선정된 최상위 유망 섹터입니다.</p>
           </div>
         </div>
+        <span class="text-[10px] text-purple-300 bg-purple-950/60 px-2 py-1 rounded border border-purple-700/40 font-mono">
+          {{ rawStore.topSectors?.length || 0 }}개 수집
+        </span>
       </div>
 
       <!-- Promising Sector Cards Grid -->
-      <div class="grid grid-cols-1 sm:grid-cols-5 gap-3">
+      <div v-if="rawStore.topSectors && rawStore.topSectors.length > 0" class="grid grid-cols-1 sm:grid-cols-5 gap-3">
         <div
           v-for="(sec, idx) in rawStore.topSectors.slice(0, 5)"
           :key="sec.code"
@@ -160,6 +163,14 @@
             +{{ Number(sec.rate).toFixed(2) }}%
           </span>
         </div>
+      </div>
+
+      <!-- 데이터 없을 때 표시 -->
+      <div v-else class="bg-slate-950/60 border border-slate-800 p-4 rounded-xl text-center">
+        <p class="text-xs text-slate-400">
+          <i class="fas fa-info-circle mr-1.5"></i>
+          유망업종 데이터를 수집 중입니다. "실시간 8대 지표 데이터 갱신" 버튼을 클릭하여 LS증권 API에서 데이터를 받아오세요.
+        </p>
       </div>
     </div>
 

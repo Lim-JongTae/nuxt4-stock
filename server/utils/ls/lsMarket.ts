@@ -68,7 +68,12 @@ export async function fetchLSSectorData(token: string): Promise<{
   topSectors: Array<{ code: string; name: string; rate: number }>;
   bottomSectors: Array<{ code: string; name: string; rate: number }>;
 } | null> {
-  if (!token) return null;
+  if (!token) {
+    console.log('⚠️ [fetchLSSectorData] 토큰 없음');
+    return null;
+  }
+
+  console.log('🔵 [fetchLSSectorData] 업종 데이터 수집 시작 (t8424)');
 
   try {
     const res = await fetch('https://openapi.ls-sec.co.kr:8080/indtp/market-data', {
@@ -85,9 +90,21 @@ export async function fetchLSSectorData(token: string): Promise<{
       signal: AbortSignal.timeout(4000)
     });
 
+    console.log('📡 [fetchLSSectorData] t8424 응답:', {
+      status: res.status,
+      ok: res.ok
+    });
+
     if (res.ok) {
       const data = await res.json();
       const rows = data.t8424OutBlock || data.t8424OutBlock1;
+
+      console.log('📊 [fetchLSSectorData] t8424 데이터:', {
+        hasRows: Array.isArray(rows),
+        rowsLength: rows?.length || 0,
+        sampleRow: rows?.[0]
+      });
+
       if (Array.isArray(rows) && rows.length > 0) {
         const sanitizeSectorName = (name: string): string | null => {
           if (!name) return null;
@@ -163,14 +180,29 @@ export async function fetchLSSectorData(token: string): Promise<{
         if (parsedList.length > 0) {
           const topSectors = [...parsedList].sort((a, b) => b.rate - a.rate).slice(0, 5);
           const bottomSectors = [...parsedList].sort((a, b) => a.rate - b.rate).slice(0, 5);
+
+          console.log('✅ [fetchLSSectorData] 업종 데이터 수집 완료:', {
+            totalSectors: parsedList.length,
+            topSectorsCount: topSectors.length,
+            topSectors: topSectors,
+            bottomSectorsCount: bottomSectors.length
+          });
+
           return { topSectors, bottomSectors };
+        } else {
+          console.log('⚠️ [fetchLSSectorData] parsedList가 비어있음 (등락률 데이터 수집 실패)');
         }
+      } else {
+        console.log('⚠️ [fetchLSSectorData] t8424 rows가 비어있거나 배열이 아님');
       }
+    } else {
+      console.log('🔴 [fetchLSSectorData] t8424 API 응답 실패:', res.status);
     }
   } catch (e: any) {
     console.error('🔴 [LS증권 업종 데이터 수신 실패]:', e.message || String(e));
   }
 
+  console.log('❌ [fetchLSSectorData] 업종 데이터 수집 실패 - null 반환');
   return null;
 }
 
