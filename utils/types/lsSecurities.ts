@@ -98,6 +98,19 @@ export interface ShortSellRecord {
   volume: number;                   // 일일 총 거래량 (주) - t1927.volume (평균 거래량 계산용)
 }
 
+// 독립 공매도 수량 CSV 레코드 (LS증권 정량 분석 데이터와 별도 관리)
+export interface ShortSellQuantityCsvRecord {
+  date: string;
+  shortSellingVolume: number;
+  netShortBalanceQuantity: number;
+}
+
+export interface ShortSellQuantityCsvResponse {
+  stockName: string;
+  csvExists: boolean;
+  records: ShortSellQuantityCsvRecord[];
+}
+
 // 8. 공매도/숏커버링 수급 분석 최종 결과
 export interface ShortSellSignalResult {
   label: "신규 공매도 유입" | "숏커버링(환매수) 유력" | "매수세가 공매도 흡수 중" | "판단 보류" | "신호 분류 불가";

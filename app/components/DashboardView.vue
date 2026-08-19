@@ -23,11 +23,17 @@
           </p>
         </div>
         <div class="flex flex-wrap items-center gap-3">
-          <button 
+          <button
             @click="openAddModal"
             class="px-4 py-2.5 rounded-xl bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
           >
             <i class="fas fa-plus-circle"></i> 종목 추가 / 편집
+          </button>
+          <button
+            @click="isShortSellQuantityModalOpen = true"
+            class="px-4 py-2.5 rounded-xl bg-linear-to-r from-yellow-800 to-green-300 hover:from-rose-500 hover:to-pink-500 text-white font-bold text-xs shadow-lg shadow-rose-500/20 flex items-center gap-2 transition-all active:scale-95 cursor-pointer"
+          >
+            <i class="fas fa-table"></i> 공매도수량 입력
           </button>
           <NuxtLink to="/portfolio" class="px-4 py-2.5 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-500/20 flex items-center gap-2 transition-all active:scale-95">
             <i class="fas fa-wallet"></i> 보유종목 상세관리
@@ -292,11 +298,15 @@
     </div>
 
     <!-- Stock Edit / Add Modal Component -->
-    <StockEditModal 
-      :is-open="isModalOpen" 
+    <StockEditModal
+      :is-open="isModalOpen"
       :initial-data="selectedStockForEdit"
       @close="isModalOpen = false"
       @saved="handleStockSaved"
+    />
+    <ShortSellQuantityModal
+      :is-open="isShortSellQuantityModalOpen"
+      @close="isShortSellQuantityModalOpen = false"
     />
   </div>
 </template>
@@ -309,6 +319,7 @@ import { useLSStockRawStore } from '~/stores/useLSStockRawStore';
 import { useMarketStrategy } from '~/composables/useMarketStrategy';
 import { useGlobalToast } from '~/composables/useGlobalToast';
 import StockEditModal, { type StockItemForm } from '~/components/StockEditModal.vue';
+import ShortSellQuantityModal from '~/components/shortselling/ShortSellQuantityModal.vue';
 
 const portfolioStore = usePortfolioStore();
 const screenerStore = useScreenerStore();
@@ -317,6 +328,7 @@ const toast = useGlobalToast();
 const { ruleBasedPerspective, buyStrategy, targetPriceStrategy, stopLossStrategy } = useMarketStrategy();
 
 const isModalOpen = ref(false);
+const isShortSellQuantityModalOpen = ref(false);
 const selectedStockForEdit = ref<StockItemForm | null>(null);
 const aiError = ref<string | null>(null);
 
