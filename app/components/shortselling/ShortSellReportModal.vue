@@ -319,7 +319,7 @@ const dtcDays = computed(() => {
   // 일평균 거래량 = 최근 20일 평균 거래량 (shortSellHistory에서 계산)
   if (shortVolumeVal.value && validShortRecords.value.length > 0) {
     const recentRecords = validShortRecords.value.slice(0, Math.min(20, validShortRecords.value.length));
-    const totalVolume = recentRecords.reduce((sum, r) => sum + (r.volume || 0), 0);
+    const totalVolume = recentRecords.reduce((sum: number, r: ShortSellRecord) => sum + (r.volume || 0), 0);
     const avgDailyVolume = totalVolume / recentRecords.length;
 
     if (avgDailyVolume > 0) {

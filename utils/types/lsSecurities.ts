@@ -111,6 +111,18 @@ export interface ShortSellQuantityCsvResponse {
   records: ShortSellQuantityCsvRecord[];
 }
 
+// 공매도 CSV 파일 정보 (파일 목록 조회용)
+export interface ShortSellCsvFileInfo {
+  stockName: string;
+  fileName: string;
+  modifiedAt: string;
+  recordCount?: number;
+}
+
+export interface ShortSellCsvListResponse {
+  files: ShortSellCsvFileInfo[];
+}
+
 // 8. 공매도/숏커버링 수급 분석 최종 결과
 export interface ShortSellSignalResult {
   label: "신규 공매도 유입" | "숏커버링(환매수) 유력" | "매수세가 공매도 흡수 중" | "판단 보류" | "신호 분류 불가";
