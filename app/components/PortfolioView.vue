@@ -191,6 +191,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import type { HoldingItem } from '../../utils/types/lsSecurities';
 import { usePortfolioStore } from '~/stores/usePortfolioStore';
 import { useScreenerStore } from '~/stores/useScreenerStore';
 import { useGlobalToast } from '~/composables/useGlobalToast';

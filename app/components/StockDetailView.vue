@@ -9,7 +9,7 @@
 
       <div class="flex items-center gap-2">
         <button 
-          @click="loadStockDetail" 
+          @click="loadStockDetail()" 
           :disabled="isLoading"
           class="px-4 py-2 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
         >
