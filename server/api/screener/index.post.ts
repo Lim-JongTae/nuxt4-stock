@@ -94,7 +94,7 @@ export default defineEventHandler(async (event) => {
   // 2. LS증권 Open API (t1102 실시간가, t1305 65일봉, t1927 공매도일별추이) 연동
   let apiCallNote = '';
   let priceFailCount = 0;
-  const stockLiveMap = new Map<string, { price?: number; indicators?: any; shortSellHistory?: ShortSellRecord[] }>();
+  const stockLiveMap = new Map<string, { price?: number; previousClosePrice?: number | null; volume?: number; indicators?: any; shortSellHistory?: ShortSellRecord[] }>();
 
   if (token) {
     const BATCH_SIZE = 1;  // LS증권 API 제한: 1초당 1개 TR만 허용
@@ -127,12 +127,20 @@ export default defineEventHandler(async (event) => {
           indicators: JSON.parse(JSON.stringify(indicators || {}))
         });
 
-        const candleList = htsPriceMap && htsPriceMap.size > 0 ? Array.from(htsPriceMap.values()) : [];
-        const latestCandleClose = candleList.length > 0 ? candleList[candleList.length - 1]?.close : undefined;
-        const latestCandleVolume = candleList.length > 0 ? candleList[candleList.length - 1]?.volume : undefined;
+        const candleList = htsPriceMap && htsPriceMap.size > 0
+          ? Array.from(htsPriceMap.entries())
+              .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+              .map(([, candle]) => candle)
+          : [];
+        const latestCandle = candleList[candleList.length - 1];
+        const previousCandle = candleList[candleList.length - 2];
+        const latestCandleClose = latestCandle?.close;
+        const previousClosePrice = previousCandle?.close ?? null;
+        const latestCandleVolume = latestCandle?.volume;
 
         stockLiveMap.set(stock.shcode, {
           price: latestCandleClose,
+          previousClosePrice,
           volume: latestCandleVolume,
           indicators,
           shortSellHistory: shortSellTrend || undefined
@@ -171,9 +179,7 @@ export default defineEventHandler(async (event) => {
   const newBatch = candidateStocks.map(s => {
     const liveData = stockLiveMap.get(s.shcode) || {};
 
-    const closePrice = liveData.price ||
-      (liveData.shortSellHistory && liveData.shortSellHistory[0]?.price) ||
-      0;
+    const closePrice = liveData.price ?? 0;
 
     const psy = liveData.indicators?.psy ?? null;
     const bb_lower = liveData.indicators?.bbLower ?? null;
@@ -261,6 +267,7 @@ export default defineEventHandler(async (event) => {
       avgPrice: s.avgPrice,
       quantity: s.quantity,
       closePrice,
+      previousClosePrice: liveData.previousClosePrice ?? null,
       volume: liveData.volume ?? null,
       psy,
       bbLower: bb_lower,

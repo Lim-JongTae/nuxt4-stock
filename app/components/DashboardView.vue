@@ -278,11 +278,19 @@
             <div class="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
               <div class="flex items-center justify-between bg-slate-900/60 px-2 py-1 rounded border border-slate-800">
                 <span class="text-slate-400 text-[10px]">전일종가:</span>
-                <strong class="text-slate-200">{{ Number(item.closePrice || 0).toLocaleString() }}원</strong>
+                <strong class="text-slate-200">{{ item.previousClosePrice && item.previousClosePrice > 0 ? Number(item.previousClosePrice).toLocaleString() + '원' : '-' }}</strong>
               </div>
               <div class="flex items-center justify-between bg-slate-900/60 px-2 py-1 rounded border border-slate-800">
                 <span class="text-slate-400 text-[10px]">현재가:</span>
-                <strong class="text-slate-400">-</strong>
+                <strong
+                  :class="typeof item.previousClosePrice === 'number' && item.previousClosePrice > 0
+                    ? item.closePrice > item.previousClosePrice
+                      ? 'text-red-400'
+                      : item.closePrice < item.previousClosePrice
+                        ? 'text-blue-400'
+                        : 'text-sky-400'
+                    : 'text-slate-400'"
+                >{{ Number(item.closePrice).toLocaleString() }}원</strong>
               </div>
             </div>
 

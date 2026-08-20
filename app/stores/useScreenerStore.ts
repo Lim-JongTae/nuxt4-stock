@@ -149,6 +149,7 @@ export const useScreenerStore = defineStore('screener', {
           holdingQuantity: item.holdingQuantity,
           holdingAvgPrice: item.holdingAvgPrice,
           closePrice: item.closePrice,
+          previousClosePrice: item.previousClosePrice,
           psy: item.psy,
           bbLower: item.bbLower,
           ma5: item.ma5,

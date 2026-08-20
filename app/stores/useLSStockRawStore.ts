@@ -9,6 +9,7 @@ import type {
 import { safeLocalStorageSet } from '../../utils/stockUtils';
 
 const RAW_CACHE_PREFIX = 'nuxt_ls_raw_data_';
+const RAW_CACHE_SCHEMA_VERSION = 2;
 const EXPIRATION_MS = 5 * 24 * 60 * 60 * 1000; // 5일 보존 정책 (주식 거래일 1주일 기준)
 
 function getTodayRawKey(): string {
@@ -17,6 +18,23 @@ function getTodayRawKey(): string {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${RAW_CACHE_PREFIX}${year}-${month}-${day}`;
+}
+
+function isValidRawCachePayload(payload: any, now = Date.now()): boolean {
+  if (!payload || payload.schemaVersion !== RAW_CACHE_SCHEMA_VERSION) return false;
+  if (!Number.isFinite(payload.cachedTimestamp) || now - payload.cachedTimestamp > EXPIRATION_MS) return false;
+  if (!Array.isArray(payload.rawStockList) || payload.rawStockList.length === 0) return false;
+
+  return payload.rawStockList.every((item: any) =>
+    item &&
+    typeof item.shcode === 'string' &&
+    item.shcode.trim().length > 0 &&
+    typeof item.closePrice === 'number' &&
+    Number.isFinite(item.closePrice) &&
+    (item.previousClosePrice === null || (
+      typeof item.previousClosePrice === 'number' && Number.isFinite(item.previousClosePrice)
+    ))
+  );
 }
 
 let inFlightFetchPromise: Promise<void> | null = null;
@@ -96,47 +114,49 @@ export const useLSStockRawStore = defineStore('lsStockRaw', {
       }
 
       const now = Date.now();
+      const validKeys: string[] = [];
       for (const key of keys) {
         try {
-          const val = localStorage.getItem(key);
-          if (val) {
-            const parsed = JSON.parse(val);
-            if (parsed.cachedTimestamp && (now - parsed.cachedTimestamp > EXPIRATION_MS)) {
+          const value = localStorage.getItem(key);
+          if (!value) continue;
+
+          const parsed = JSON.parse(value);
+          if (key.startsWith(RAW_CACHE_PREFIX)) {
+            if (isValidRawCachePayload(parsed, now)) {
+              validKeys.push(key);
+            } else {
               localStorage.removeItem(key);
             }
+          } else if (parsed.cachedTimestamp && now - parsed.cachedTimestamp > EXPIRATION_MS) {
+            localStorage.removeItem(key);
           }
-        } catch {}
+        } catch {
+          localStorage.removeItem(key);
+        }
       }
 
       const todayKey = getTodayRawKey();
-      const validKeys = keys.filter(k => {
-        try {
-          const val = localStorage.getItem(k);
-          if (val) {
-            const parsed = JSON.parse(val);
-            return parsed.cachedTimestamp && (now - parsed.cachedTimestamp <= EXPIRATION_MS);
-          }
-        } catch {}
-        return false;
-      }).sort();
-
-      const targetKey = localStorage.getItem(todayKey) ? todayKey : (validKeys.pop() || todayKey);
+      const targetKey = validKeys.includes(todayKey) ? todayKey : (validKeys.sort().pop() || todayKey);
 
       try {
         const cached = localStorage.getItem(targetKey);
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (parsed.rawStockList && Array.isArray(parsed.rawStockList) && parsed.rawStockList.length > 0) {
-            this.rawStockList = parsed.rawStockList;
-            this.marketBasis = parsed.marketBasis || null;
-            this.topSectors = parsed.topSectors || [];
-            this.bottomSectors = parsed.bottomSectors || [];
-            this.lastUpdated = parsed.lastUpdated || '';
-            this.cachedTimestamp = parsed.cachedTimestamp || 0;
-            this.sourceProvider = parsed.sourceProvider || 'LS증권 Open API';
-          }
+        if (!cached) return;
+
+        const parsed = JSON.parse(cached);
+        if (!isValidRawCachePayload(parsed, now)) {
+          localStorage.removeItem(targetKey);
+          return;
         }
+
+        this.rawStockList = parsed.rawStockList;
+        this.marketBasis = parsed.marketBasis || null;
+        this.topSectors = parsed.topSectors || [];
+        this.bottomSectors = parsed.bottomSectors || [];
+        this.lastUpdated = parsed.lastUpdated || '';
+        this.cachedTimestamp = parsed.cachedTimestamp || 0;
+        this.sourceProvider = parsed.sourceProvider || 'LS증권 Open API';
       } catch (e) {
+        localStorage.removeItem(targetKey);
         console.error('Failed to init from storage:', e);
       }
     },
@@ -144,6 +164,7 @@ export const useLSStockRawStore = defineStore('lsStockRaw', {
     saveToStorage() {
       const todayKey = getTodayRawKey();
       safeLocalStorageSet(todayKey, {
+        schemaVersion: RAW_CACHE_SCHEMA_VERSION,
         rawStockList: this.rawStockList,
         marketBasis: this.marketBasis,
         topSectors: this.topSectors,
@@ -160,7 +181,15 @@ export const useLSStockRawStore = defineStore('lsStockRaw', {
 
       // 2. 오늘 날짜 데이터가 이미 있고 강제 새로고침이 아니면 API 호출 스킵
       const todayKey = getTodayRawKey();
-      const hasTodayData = !!localStorage.getItem(todayKey);
+      let hasTodayData = false;
+      const todayCache = localStorage.getItem(todayKey);
+      if (todayCache) {
+        try {
+          hasTodayData = isValidRawCachePayload(JSON.parse(todayCache));
+        } catch {
+          localStorage.removeItem(todayKey);
+        }
+      }
 
       if (!forceRefresh && hasTodayData && this.rawStockList.length > 0) {
         console.log('✅ [useLSStockRawStore] 오늘 날짜 캐시 데이터 사용 (API 호출 스킵):', {

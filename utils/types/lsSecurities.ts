@@ -177,6 +177,7 @@ export interface RawStockApiData {
   holdingQuantity?: number;
   holdingAvgPrice?: number;
   closePrice: number;
+  previousClosePrice?: number | null;
   psy?: number | null;
   bbLower?: number | null;
   ma5?: number | null;
@@ -201,6 +202,7 @@ export interface CalculatedStockDetail {
   holdingQuantity?: number;
   holdingAvgPrice?: number;
   closePrice: number;
+  previousClosePrice?: number | null;
   psy: number | null;
   bbLower: number | null;
   ma5: number | null;
@@ -233,6 +235,7 @@ export interface StockItem {
   holdingQuantity?: number;
   holdingAvgPrice?: number;
   closePrice: number;
+  previousClosePrice?: number | null;
   volume?: number | null;  // 당일 거래량 (DTC 계산용)
   psy?: number | null;
   bbLower?: number | null;
